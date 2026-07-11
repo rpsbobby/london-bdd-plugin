@@ -18,6 +18,35 @@ GREENFIELD                          LEGACY (SAFE / FULL_REFACTOR)
 Support: /london-bdd:acceptance  /london-bdd:unit  /london-bdd:adr  /london-bdd:debt
 ```
 
+## Command reference
+
+All commands live under the `/london-bdd:` prefix.
+
+**Slice entry points** — every piece of work starts with exactly one of these:
+
+| Command | Use when | What it does |
+|---|---|---|
+| `/london-bdd:scenario` | Starting **new** behaviour (greenfield) | Conversation first: agree ubiquitous language, write the Gherkin scenario and the failing acceptance test — the outer red. |
+| `/london-bdd:refactor-scope` | Touching **existing untested** code | Declares the blast radius of a legacy change (what/in/out/seams, SAFE or FULL_REFACTOR mode). Scope only — never solution design. |
+
+**The loop** — run in order once a slice is open:
+
+| Command | Phase | What it does |
+|---|---|---|
+| `/london-bdd:characterise` | Legacy, before change | Locks in CURRENT behaviour (right or wrong) as a regression net around the scope. Re-run post-slice to verify behaviour preserved. |
+| `/london-bdd:decompose` | Between outer red and inner loop | Discovers collaborators, names roles in DDD language, sketches interface boundaries, agrees the sequence — before any code. |
+| `/london-bdd:inner` | Inner loop, ×N | One full cycle for the next collaborator: failing unit test with you, minimum implementation (implementer agent), review and refactor (reviewer agent), one commit on feature-tmp. |
+| `/london-bdd:review` | Collaborator queue empty | Slice-level gate: reviewer agent audits the whole diff, clean-code pass, distil-candidate triage, then closes the outer loop. |
+
+**Support** — invoked directly at any time, or by the loop commands:
+
+| Command | What it does |
+|---|---|
+| `/london-bdd:acceptance` | Writes/extends a DSL-driven acceptance test (Given/When/Then). Usually via `/scenario`; direct for sad paths or a new AT. |
+| `/london-bdd:unit` | One failing unit test for the current collaborator — behaviour-named, mocked collaborators, ~10 lines max. Usually via `/inner`. |
+| `/london-bdd:adr` | Records an architecture decision — Context, Decision, Consequences, one page, in `adr/` next to the code. |
+| `/london-bdd:debt` | Logs a `tech-debt/register.yml` entry — for scope-creep temptations, bugs found during characterisation, and every "while we're here". |
+
 ## What's enforced (hooks)
 
 - **A.** Production edits need a license: a recorded failing test, OR
