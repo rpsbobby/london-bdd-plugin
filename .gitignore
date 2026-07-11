@@ -1,0 +1,12 @@
+# Python
+__pycache__/
+*.pyc
+
+# Editor / OS
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# Never commit a consumer's runtime state if this repo is ever used as a workspace
+.bdd/

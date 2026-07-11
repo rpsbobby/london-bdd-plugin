@@ -1,0 +1,13 @@
+{
+  "name": "london-bdd-marketplace",
+  "owner": {
+    "name": "Robert Szlufik"
+  },
+  "plugins": [
+    {
+      "name": "london-bdd",
+      "source": ".",
+      "description": "Outside-in London School BDD double loop with model-routed agents (Haiku implementer, Sonnet reviewer), characterisation-first legacy workflow, scope-enforcement hooks, and feature-tmp/feature-main branching discipline."
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "name": "london-bdd",
+  "displayName": "London School BDD Double Loop",
+  "version": "0.1.0",
+  "description": "Outside-in BDD double loop with model-routed agents, characterisation-first legacy workflow, scope enforcement, and disciplined branching. Operationalises GOOS, Feathers, Clean Architecture, DDD, Refactoring, and CD as one workflow.",
+  "author": {
+    "name": "Robert Szlufik"
+  },
+  "license": "MIT",
+  "keywords": ["bdd", "tdd", "london-school", "outside-in", "characterisation", "refactoring", "legacy"]
+}
