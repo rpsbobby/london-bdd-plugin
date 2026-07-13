@@ -29,8 +29,8 @@ skill and `references/scope-template.md`.
    - `SAFE` (default): characterise → small moves → verify. Boy scout rule.
    - `FULL_REFACTOR`: only with an explicit mandate. Ask: "Has this been
      agreed with the team?" Record the answer in the scope artifact.
-4. Create branches (`feature-main/<slice>`, `feature-tmp/<slice>`), check
-   out feature-tmp.
+4. Create branches (`feature/<slice>-main`, `feature/<slice>-tmp`), check
+   out feature/<slice>-tmp.
 5. Write `.bdd/session.yml` with `mode`, `phase: characterise`, the scope
    block, branch fields.
 6. Write the human-readable scope artifact to `.bdd/scope-<slice>.md`

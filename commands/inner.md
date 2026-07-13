@@ -1,6 +1,6 @@
 ---
 name: inner
-description: Run one full inner-loop cycle for the next collaborator — failing unit test (with the user), minimum implementation (implementer agent, Haiku), review and refactor (reviewer agent, Sonnet), one commit on feature-tmp. Repeat until the collaborator queue is empty.
+description: Run one full inner-loop cycle for the next collaborator — failing unit test (with the user), minimum implementation (implementer agent, Haiku), review and refactor (reviewer agent, Sonnet), one commit on feature/<slice>-tmp. Repeat until the collaborator queue is empty.
 ---
 
 # /inner — One Cycle: Red → Green → Refactor → Commit
@@ -11,10 +11,10 @@ The orchestrator. Read the `london-bdd` skill first.
 
 1. `.bdd/session.yml` exists, `phase: inner`, collaborator queue non-empty.
 2. **Branch check:** `git branch --show-current` equals session `branch`
-   (a `feature-tmp/*`).
-   - On the slice's feature-main → offer: "Inner loop runs on feature-tmp
-     only. Create/checkout `<branch>` from here? [y/n]". Never proceed on
-     feature-main.
+   (a `feature/*-tmp`).
+   - On the slice's feature/<slice>-main → offer: "Inner loop runs on
+     feature/<slice>-tmp only. Create/checkout `<branch>` from here? [y/n]".
+     Never proceed on feature/<slice>-main.
    - Anywhere else / detached / dirty → STOP, explain, let the human fix.
      Never auto-stash, never auto-commit rescue work.
 3. Outer net intact: AT red-for-the-right-reason (greenfield) or
@@ -44,7 +44,7 @@ smells, boundary violations, over-implementation beyond the test) and
 **proposes** refactors. Present the proposals to the user; apply only the
 accepted ones. All tests must stay green. Announce `🔵 Refactor`.
 
-### 4 — COMMIT (once per cycle, feature-tmp only)
+### 4 — COMMIT (once per cycle, feature/<slice>-tmp only)
 - Verify branch again (belt and braces — the hook also checks).
 - Clear `current_failing_test`, set collaborator `status: done`,
   increment `cycle`, update `last_commit` in session.yml.
@@ -53,13 +53,15 @@ accepted ones. All tests must stay green. Announce `🔵 Refactor`.
 
 ### 5 — NEXT
 Queue non-empty → tell the user `/inner` again for the next collaborator.
-Queue empty → set `phase: close`; next command is `/review` for the slice
-gate, then close the outer loop (wire the composition root, run the AT /
-characterisation verification).
+Queue empty → set `phase: close`; tell the user next command is `/review`
+for the slice gate, then close the outer loop (wire the composition root,
+run the AT / characterisation verification).
 
 ## Hard rules
 
 - One failing test at a time. Never start a new red with one open.
 - The implementer agent NEVER edits test files or session.yml.
-- Squash-merging to feature-main is the developer's action, by hand, when
-  a slice or meaningful group of cycles is complete. Never automate it.
+- Squash-merging onto feature/<slice>-main happens via `/commit-merge`,
+  after `/review` sets `phase: done` — manual by default, or agent-run in
+  `--auto` mode with fresh per-invocation authorization. Never merge
+  directly here.

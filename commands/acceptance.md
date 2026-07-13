@@ -45,7 +45,7 @@ Read the `london-bdd` skill. Language tooling:
 
 ## Procedure
 
-1. Check session.yml — active slice, on feature-tmp.
+1. Check session.yml — active slice, on feature/<slice>-tmp.
 2. Draft the Gherkin (or DSL test names) first; confirm with the user.
 3. Name the boundary doubles you expect to need and WHICH port each
    represents. Confirm with the user — these become collaborators in
@@ -57,6 +57,9 @@ Read the `london-bdd` skill. Language tooling:
    identified boundary ports so /decompose can seed the collaborator queue.
 6. Commit: `test: failing acceptance test — <behaviour>`
 7. Announce `🔴 AT: <behaviour>`.
+8. Tell the user the next command: `/decompose` if this introduced
+   collaborators not yet in the queue, otherwise `/inner` to keep working
+   the existing queue.
 
 ## Rules
 

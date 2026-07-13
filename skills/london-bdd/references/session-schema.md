@@ -2,8 +2,8 @@
 
 Every command reads this file first and updates it last. It is the single
 source of truth for where we are in the workflow. It lives in the project
-root under `.bdd/` and is committed to `feature-tmp` (it documents the
-slice), but excluded from the squash onto `feature-main`.
+root under `.bdd/` and is committed to `feature/<slice>-tmp` (it documents
+the slice), but excluded from the squash onto `feature/<slice>-main`.
 
 If the file is missing, no slice is active — only `/scenario` or
 `/refactor-scope` may create it.
@@ -16,8 +16,8 @@ slice: place-order                  # kebab-case slice name
 mode: GREENFIELD                    # GREENFIELD | SAFE | FULL_REFACTOR
 phase: inner                        # scope | characterise | scenario |
                                     # decompose | inner | close | done
-branch: feature-tmp/place-order     # expected working branch
-base_branch: feature-main/place-order
+branch: feature/place-order-tmp     # expected working branch
+base_branch: feature/place-order-main
 
 # GREENFIELD / FULL_REFACTOR — the outer net is the acceptance test
 acceptance_test:
@@ -56,6 +56,13 @@ cycle: 3                            # increments per completed t+i+r cycle
 last_commit: "cycle 3: OrderService delegates to OrderRepository"
 ```
 
+`/commit-merge --auto` authorizes its squash-merge through a *separate*,
+untracked `.bdd/.merge-authorized` marker file — never a session.yml
+field. `git checkout feature/<slice>-main` removes session.yml from the
+working tree (it's tracked only on the tmp branch), so nothing in
+session.yml can carry state across that checkout. See `/commit-merge` and
+`scripts/guard.py` for the marker's exact format and lifecycle.
+
 ## Field rules
 
 - `current_failing_test` is set by `/unit` (or `/acceptance` for the outer
@@ -66,6 +73,7 @@ last_commit: "cycle 3: OrderService delegates to OrderRepository"
 - `phase` transitions are forward-only within a slice:
   `scope → characterise → scenario → decompose → inner → close → done`
   (GREENFIELD skips scope/characterise). Commands refuse to run out of
-  order and say which command is expected next.
+  order and say which command is expected next. `done` is terminal for the
+  slice; `/commit-merge` is the only command that still acts on it.
 - One slice per session file. New slice = archive old file to
   `.bdd/archive/<slice>.yml`, create fresh.

@@ -15,7 +15,7 @@ role the acceptance test plays in greenfield.
 
 1. `.bdd/session.yml` exists with a declared scope, `phase: characterise`
    (or `phase: close`, for the post-slice verification run).
-2. On the slice's `feature-tmp` branch.
+2. On the slice's `feature/<slice>-tmp` branch.
 
 ## Building the net (phase: characterise)
 
@@ -43,14 +43,16 @@ For each seam declared in scope:
      `phase: decompose` (FULL_REFACTOR) or `phase: inner` (SAFE — small
      moves may not need formal decomposition; ask the user).
    - Commit: `test: characterisation net — <slice>`
+   - Tell the user the next command: `/decompose` (FULL_REFACTOR) or
+     `/inner` (SAFE).
 
 ## Verification run (phase: close)
 
-Run the suite. Green = behaviour preserved; report and proceed to close.
-Red = a change altered observable behaviour. STOP and present the diff to
-the user: is this an intended behaviour change (update the test, record
-WHY in the commit message) or a regression (fix under the net)? Never
-decide this alone.
+Run the suite. Green = behaviour preserved; report and hand back to
+`/review`, which invoked this run. Red = a change altered observable
+behaviour. STOP and present the diff to the user: is this an intended
+behaviour change (update the test, record WHY in the commit message) or a
+regression (fix under the net)? Never decide this alone.
 
 ## Rules
 

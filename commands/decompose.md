@@ -10,7 +10,7 @@ Read the `london-bdd` skill and `references/collaborator-discovery.md`.
 ## Preconditions
 
 1. `.bdd/session.yml`: `phase: decompose`, outer net red (AT) or green
-   (characterisation), on feature-tmp.
+   (characterisation), on feature/<slice>-tmp.
 
 ## Steps
 

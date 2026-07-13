@@ -35,9 +35,9 @@ Work through these WITH the user, one at a time:
 1. Write the Gherkin scenario (shape in the skill: Feature/Background/
    Scenario, happy + sad path). Confirm with the user.
 2. Create the branches:
-   - `feature-main/<slice>` from the current branch
-   - `feature-tmp/<slice>` from feature-main
-   - Check out `feature-tmp/<slice>`.
+   - `feature/<slice>-main` from the current branch
+   - `feature/<slice>-tmp` from feature/<slice>-main
+   - Check out `feature/<slice>-tmp`.
 3. Write the failing acceptance test using the `/acceptance` shape
    (DSL-driven, Given/When/Then, **no mocks, no test doubles of our own
    code**). It must compile and fail for the right reason (behaviour
@@ -45,7 +45,7 @@ Work through these WITH the user, one at a time:
 4. Create `.bdd/session.yml`:
    `mode: GREENFIELD`, `phase: decompose`, `acceptance_test.status: red`,
    branch fields set, empty collaborator list.
-5. Commit on feature-tmp: `test: failing acceptance test — <slice>`
+5. Commit on feature/<slice>-tmp: `test: failing acceptance test — <slice>`
 6. Announce: `🔴 AT: <behaviour>` and tell the user the next command is
    `/decompose`.
 

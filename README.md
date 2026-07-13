@@ -15,8 +15,11 @@ GREENFIELD                          LEGACY (SAFE / FULL_REFACTOR)
 /london-bdd:inner  (×N)             (/london-bdd:decompose)
 /london-bdd:review                  /london-bdd:inner (×N) → :review
                                     /london-bdd:characterise (verify)
+/london-bdd:commit-merge            /london-bdd:commit-merge
 Support: /london-bdd:acceptance  /london-bdd:unit  /london-bdd:adr  /london-bdd:debt
 ```
+
+Every command tells you which one is next when it finishes.
 
 ## Command reference
 
@@ -35,8 +38,9 @@ All commands live under the `/london-bdd:` prefix.
 |---|---|---|
 | `/london-bdd:characterise` | Legacy, before change | Locks in CURRENT behaviour (right or wrong) as a regression net around the scope. Re-run post-slice to verify behaviour preserved. |
 | `/london-bdd:decompose` | Between outer red and inner loop | Discovers collaborators, names roles in DDD language, sketches interface boundaries, agrees the sequence — before any code. |
-| `/london-bdd:inner` | Inner loop, ×N | One full cycle for the next collaborator: failing unit test with you, minimum implementation (implementer agent), review and refactor (reviewer agent), one commit on feature-tmp. |
+| `/london-bdd:inner` | Inner loop, ×N | One full cycle for the next collaborator: failing unit test with you, minimum implementation (implementer agent), review and refactor (reviewer agent), one commit on feature/<slice>-tmp. |
 | `/london-bdd:review` | Collaborator queue empty | Slice-level gate: reviewer agent audits the whole diff, clean-code pass, distil-candidate triage, then closes the outer loop. |
+| `/london-bdd:commit-merge` | `phase: done` | Lands the slice: squash-merges feature/<slice>-tmp onto feature/<slice>-main. Manual by default (prints the commands); `--auto` runs the merge itself, authorized fresh each invocation. Never pushes. |
 
 **Support** — invoked directly at any time, or by the loop commands:
 
@@ -53,7 +57,10 @@ All commands live under the `/london-bdd:` prefix.
   phase `close` (wiring), OR SAFE mode with a green characterisation net.
 - **B.** SAFE/FULL_REFACTOR: no edit outside the declared scope —
   "while we're here" must be explicit or logged to debt.
-- **C.** Agent commits only on `feature-tmp/*`; merges are human-only.
+- **C.** Agent commits only on `feature/*-tmp`. Merges onto
+  `feature/*-main` are human-only by default, or agent-run via
+  `/commit-merge --auto` with fresh per-run authorization; rebases and
+  pushes are always human.
 
 The guard is silent when no `.bdd/session.yml` slice is active.
 
@@ -67,9 +74,11 @@ The guard is silent when no `.bdd/session.yml` slice is active.
 
 ## Branching
 
-`feature-tmp/<slice>`: one agent commit per cycle (test+impl+refactor),
-disposable. `feature-main/<slice>`: you squash-merge by hand when a slice
-is meaningfully complete. `.bdd/` files stay out of the squash.
+`feature/<slice>-tmp`: one agent commit per cycle (test+impl+refactor),
+disposable. `feature/<slice>-main`: landed via `/commit-merge` when the
+slice is meaningfully complete — manual by default (you run the squash
+yourself), or `--auto` to let the agent run it, confirmed fresh every
+time. `.bdd/` files stay out of the squash.
 
 ## Install
 
@@ -132,7 +141,7 @@ This project uses the london-bdd plugin for all feature and refactor work.
 - New behaviour            → /london-bdd:scenario
 - Any change to legacy code → /london-bdd:refactor-scope FIRST
 - Never write production code without a failing test (hook-enforced)
-- Agent commits: feature-tmp only; I squash to feature-main myself
+- Agent commits: feature/<slice>-tmp only; land slices via /commit-merge
 Domain glossary: docs/glossary.md (role names must match it)
 ```
 
@@ -144,5 +153,9 @@ commands/                      workflow entry points (thin)
 agents/implementer.md          Haiku, minimum code, no test edits
 agents/reviewer.md             Sonnet, critique only
 hooks/hooks.json + scripts/    the three hard rules
+tests/test_guard.py            regression suite for the guard hook (pytest)
 skills/london-bdd/             knowledge layer + references
 ```
+
+`scripts/guard.py` is the one piece of this repo that's actual code rather
+than prompts — it has its own test suite: `python3 -m pytest tests/`.

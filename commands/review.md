@@ -8,7 +8,7 @@ description: Slice-level review gate — reviewer agent audits the whole slice d
 ## Preconditions
 
 `.bdd/session.yml`: `phase: close`, all collaborators `done`, on
-feature-tmp.
+feature/<slice>-tmp.
 
 ## Steps
 
@@ -20,7 +20,7 @@ feature-tmp.
      re-open `phase: inner` with the discovered collaborator.
    - SAFE/FULL_REFACTOR: run `/characterise` in verification mode.
 3. **Dispatch `london-bdd:reviewer`** with the full slice diff
-   (feature-tmp vs base). Slice-level concerns: duplication across cycles,
+   (feature/<slice>-tmp vs base). Slice-level concerns: duplication across cycles,
    names drifting from the ubiquitous language, boundary rule violations,
    test suite coherence, anything implemented beyond what tests demand.
    Present proposals; apply accepted ones; keep everything green.
@@ -30,8 +30,7 @@ feature-tmp.
    The characterisation suite should shrink over time.
 5. **Reflection (from the skill):** any awkward mock (design smell)?
    duplicated setup? happy AND sad path covered?
-6. Final commit on feature-tmp. Set `phase: done`.
-7. **Hand back to the human:** present the squash-merge summary
-   (cycles, files, behaviours) and the suggested squash message. The
-   developer performs the squash onto feature-main themselves. Remind:
-   `.bdd/session.yml` and scope artifacts stay out of the squash.
+6. Final commit on feature/<slice>-tmp. Set `phase: done`.
+7. Tell the user: the slice is closed, next command is `/commit-merge` to
+   land it on feature/<slice>-main (manual by default, `--auto` to let the
+   agent run the squash-merge itself).

@@ -5,10 +5,29 @@ Enforces the three hard rules when a .bdd/session.yml slice is active:
 
   A. No production edit without a recorded failing test.
   B. In SAFE / FULL_REFACTOR mode, no edit outside the declared scope.
-  C. `git commit` only on the slice's feature-tmp branch.
+  C. `git commit` only on the slice's feature/<slice>-tmp branch. Merges
+     onto feature/<slice>-main are the developer's manual action, unless
+     `/commit-merge --auto` has dropped a fresh, untracked
+     `.bdd/.merge-authorized` marker naming this exact tmp/base branch
+     pair (see find_merge_marker). Rebases are never allowed for the agent.
 
-If no session file exists, the guard is silent — the plugin never
-interferes with work outside a BDD slice.
+Note on the marker file: `git checkout <base_branch>` removes
+`.bdd/session.yml` from the working tree (it's tracked only on the tmp
+branch), so by the time `git merge --squash` actually runs, session.yml is
+gone and Rule C can't consult it. `.merge-authorized` is deliberately
+never git-added, so checkout never touches it — it survives the branch
+switch and is the only thing Rule C's merge/landing-commit checks rely on.
+
+Because session.yml is unreadable on a slice's main branch, an *entirely
+unauthorized* merge attempt there (no marker at all) can't be detected by
+session.yml either. `sibling_tmp_branch` closes that gap: if the current
+branch matches `feature/<slice>-main` and `feature/<slice>-tmp` exists,
+Rule C treats it as governed and blocks the merge regardless of whether
+any session file is present.
+
+If none of session.yml, the merge marker, or a matching tmp sibling
+branch are found, the guard is silent — the plugin never interferes with
+work outside a BDD slice.
 
 Exit 0        -> allow
 Exit 2 + msg  -> block (stderr message is shown to Claude)
@@ -41,8 +60,9 @@ def find_session(start):
 
 def parse_session(path):
     """Minimal YAML subset parser — avoids a PyYAML dependency."""
-    s = {"mode": None, "branch": None, "current_failing_test": None,
-         "scope_in": [], "scope_out": [], "phase": None, "char_status": None}
+    s = {"mode": None, "branch": None, "base_branch": None,
+         "current_failing_test": None, "scope_in": [], "scope_out": [],
+         "phase": None, "char_status": None}
     try:
         text = open(path, encoding="utf-8").read()
     except OSError:
@@ -53,6 +73,8 @@ def parse_session(path):
     if m: s["phase"] = m.group(1)
     m = re.search(r"^branch:\s*(\S+)", text, re.M)
     if m: s["branch"] = m.group(1)
+    m = re.search(r"^base_branch:\s*(\S+)", text, re.M)
+    if m: s["base_branch"] = m.group(1)
     m = re.search(r"^current_failing_test:\s*\n((?:[ \t]+.*\n?)*)", text, re.M)
     if m and re.search(r"\bfile:\s*\S", m.group(1)):
         s["current_failing_test"] = True
@@ -73,6 +95,32 @@ def parse_session(path):
     return s
 
 
+MERGE_MARKER = ".merge-authorized"
+
+
+def find_merge_marker(start):
+    """Untracked marker dropped by /commit-merge --auto. Never git-added,
+    so `git checkout <base_branch>` never removes it — unlike
+    .bdd/session.yml, which is tracked only on the tmp branch."""
+    d = os.path.abspath(start)
+    while True:
+        p = os.path.join(d, ".bdd", MERGE_MARKER)
+        if os.path.isfile(p):
+            try:
+                text = open(p, encoding="utf-8").read()
+            except OSError:
+                return None, None
+            mb = re.search(r"^branch:\s*(\S+)", text, re.M)
+            mm = re.search(r"^base_branch:\s*(\S+)", text, re.M)
+            if mb and mm:
+                return {"branch": mb.group(1), "base_branch": mm.group(1)}, d
+            return None, None
+        parent = os.path.dirname(d)
+        if parent == d:
+            return None, None
+        d = parent
+
+
 def git_branch(cwd):
     try:
         return subprocess.run(
@@ -80,6 +128,24 @@ def git_branch(cwd):
             capture_output=True, text=True, timeout=5).stdout.strip()
     except Exception:
         return ""
+
+
+def sibling_tmp_branch(cwd, br):
+    """If br is a slice's feature/<slice>-main and feature/<slice>-tmp
+    exists, return the tmp branch name. Lets Rule C recognize a slice's
+    main branch as governed even when .bdd/session.yml (tracked only on
+    tmp) isn't present in the working tree to prove it."""
+    m = re.match(r"^feature/(.+)-main$", br or "")
+    if not m:
+        return None
+    tmp = f"feature/{m.group(1)}-tmp"
+    try:
+        out = subprocess.run(
+            ["git", "branch", "--list", tmp], cwd=cwd,
+            capture_output=True, text=True, timeout=5).stdout
+        return tmp if out.strip() else None
+    except Exception:
+        return None
 
 
 def block(msg):
@@ -124,30 +190,51 @@ def main():
     tool_input = payload.get("tool_input", {}) or {}
     cwd = payload.get("cwd") or os.getcwd()
 
-    session_path, root = find_session(cwd)
-    if not session_path:
-        sys.exit(0)  # no active slice -> guard is silent
-    s = parse_session(session_path)
+    session_path, session_root = find_session(cwd)
+    s = parse_session(session_path) if session_path else None
+    marker, marker_root = find_merge_marker(cwd)
+    root = session_root or marker_root or os.path.abspath(cwd)
 
     if kind == "bash":
         cmd = tool_input.get("command", "")
         if re.search(r"\bgit\s+(commit|merge|rebase)\b", cmd):
             br = git_branch(root)
-            if re.search(r"\bgit\s+commit\b", cmd):
-                if s["branch"] and br != s["branch"]:
+            sibling = sibling_tmp_branch(root, br)
+            if not session_path and not marker and not sibling:
+                sys.exit(0)  # not a slice's tmp, main, or pending merge -> silent
+            landing = bool(marker) and br == marker["base_branch"]
+            if re.search(r"\bgit\s+commit\b", cmd) and not landing:
+                if s and s["branch"] and br != s["branch"]:
                     block(f"Rule C: commits belong on '{s['branch']}' "
                           f"(currently on '{br or 'unknown'}'). Check out the "
                           "slice branch or let the developer commit by hand.")
-                if not br.startswith("feature-tmp"):
+                if not re.match(r"^feature/.+-tmp$", br):
                     block("Rule C: agent commits are allowed only on a "
-                          "feature-tmp branch. Squash-merges to feature-main "
-                          "are the developer's manual action.")
-            if re.search(r"\bgit\s+(merge|rebase)\b", cmd):
-                block("Rule C: merges/rebases onto shared branches are the "
-                      "developer's manual action, never the agent's.")
+                          "feature/<slice>-tmp branch, or the merge-landing "
+                          "commit authorized via /commit-merge --auto.")
+            if re.search(r"\bgit\s+rebase\b", cmd):
+                block("Rule C: rebases are the developer's manual action, "
+                      "never the agent's.")
+            if re.search(r"\bgit\s+merge\b", cmd):
+                squash_src = re.search(r"--squash\s+(\S+)", cmd)
+                authorized = (
+                    landing
+                    and squash_src is not None
+                    and squash_src.group(1) == marker["branch"]
+                )
+                if not authorized:
+                    block("Rule C: merges onto shared branches are the "
+                          "developer's manual action, unless authorized via "
+                          "`/commit-merge --auto` — a fresh "
+                          ".bdd/.merge-authorized marker naming this exact "
+                          "tmp branch, while checked out on its "
+                          "base_branch, with an exact "
+                          "'git merge --squash <tmp>'.")
         sys.exit(0)
 
     # kind == "edit"
+    if not session_path:
+        sys.exit(0)  # no active slice -> guard is silent
     fp = tool_input.get("file_path") or tool_input.get("path") or ""
     if not fp:
         sys.exit(0)

@@ -33,7 +33,7 @@ Read the `london-bdd` skill. Language tooling in references.
 ## Procedure
 
 1. Check session.yml: `phase: inner`, a collaborator with
-   `status: pending|red` at the head of the queue, on feature-tmp,
+   `status: pending|red` at the head of the queue, on feature/<slice>-tmp,
    `current_failing_test` empty (one red at a time — never two).
 2. Confirm with the user which behaviour of the collaborator this test
    drives.
@@ -41,6 +41,7 @@ Read the `london-bdd` skill. Language tooling in references.
 4. Set `current_failing_test` in session.yml (this unlocks production
    edits for the hook), collaborator `status: red`.
 5. Announce `🔴 UT: <class> — <behaviour>`.
+6. Hand back to `/inner` — its GREEN step (implementer agent) is next.
 
 Do NOT commit here — the commit happens once per full cycle
 (test + impl + refactor), handled by /inner.

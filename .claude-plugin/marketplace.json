@@ -7,7 +7,7 @@
     {
       "name": "london-bdd",
       "source": ".",
-      "description": "Outside-in London School BDD double loop with model-routed agents (Haiku implementer, Sonnet reviewer), characterisation-first legacy workflow, scope-enforcement hooks, and feature-tmp/feature-main branching discipline."
+      "description": "Outside-in London School BDD double loop with model-routed agents (Haiku implementer, Sonnet reviewer), characterisation-first legacy workflow, scope-enforcement hooks, and feature/<slice>-tmp / feature/<slice>-main branching discipline."
     }
   ]
 }

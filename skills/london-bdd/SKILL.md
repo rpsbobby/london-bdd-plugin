@@ -42,7 +42,11 @@ GREENFIELD                          SAFE / FULL_REFACTOR (legacy)
 /inner ×N   cycle per collaborator   (/decompose if FULL_REFACTOR)
 /review     slice gate, close loop   /inner ×N  →  /review
                                      /characterise (verify: still green)
+/commit-merge   land the slice (both workflows, once phase: done)
 ```
+
+Every command ends by naming the next one — the loop always tells you
+where to go.
 
 Mode is declared at slice start and recorded in `.bdd/session.yml`.
 Switching modes mid-slice requires an explicit checkpoint with the user.
@@ -127,14 +131,17 @@ gets one failing test and the interfaces it references — nothing else.
 ## Branching discipline
 
 ```
-feature-main/<slice>  human history — developer squash-merges by hand
-feature-tmp/<slice>   agent workspace — one commit per completed cycle
+feature/<slice>-main  human history — landed via /commit-merge
+feature/<slice>-tmp   agent workspace — one commit per completed cycle
                       (test + impl + refactor together), disposable
 ```
 
-Never commit on feature-main. Never auto-merge. Never auto-stash. Wrong
-branch = stop and ask. The guard hook enforces this; commands check first
-anyway — commands are polite, hooks are absolute.
+Never commit on feature/<slice>-main. Never auto-stash. Wrong branch = stop
+and ask. Merging tmp onto main happens only through `/commit-merge`: manual
+by default (prints the commands, developer runs them), or `--auto` where
+the agent runs the squash-merge itself, authorized fresh every invocation
+— never a persisted "always auto". The guard hook enforces all of this;
+commands check first anyway — commands are polite, hooks are absolute.
 
 ## The three hard rules (hook-enforced)
 
@@ -144,7 +151,10 @@ anyway — commands are polite, hooks are absolute.
   net (refactoring moves are green-to-green; the net is the license).
 - **B.** In SAFE/FULL_REFACTOR, no edit outside the declared scope.
   "While we're here" → extend scope explicitly or `/debt`.
-- **C.** Agent commits only on `feature-tmp/*`. Merges are human.
+- **C.** Agent commits only on `feature/*-tmp`. Merges onto
+  `feature/*-main` are human by default, or agent-run via
+  `/commit-merge --auto` with fresh per-run authorization. Rebases are
+  always human.
 
 ## Operating rules
 
