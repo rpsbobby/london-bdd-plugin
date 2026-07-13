@@ -12,6 +12,10 @@ Read the `london-bdd` skill. Language tooling:
 
 - **DSL-driven.** Given/When/Then structure, readable by a non-developer.
   The test IS the executable specification.
+- **Executable identifier is `should_`-prefixed** — same convention as
+  unit tests (`it('should …')`, `def test_should_…`, `func TestShould…`).
+  Gherkin `Scenario:` titles stay pure business language; the prefix
+  applies to the wrapping test function/identifier, not the DSL text.
 - **Business language throughout.** Domain terms from the ubiquitous
   language; no HTTP verbs, SQL, or class names in scenario text.
 - **Doubles at the boundary, deliberately — this is the point.** A feature

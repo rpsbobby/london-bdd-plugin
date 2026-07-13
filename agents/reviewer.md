@@ -18,10 +18,14 @@ Review against, in order:
 2. **The sentence heuristic** — read each test body as a sentence. Where
    it doesn't flow, the interface is wrong; say what the natural sentence
    would be.
-3. **Ubiquitous language** — names drifting from the domain vocabulary or
+3. **Naming convention** — every acceptance/unit test name starts with
+   `should_` (or `test_should_` / `TestShould` where the framework requires
+   a discovery prefix). Flag any that don't; characterisation tests are
+   exempt.
+4. **Ubiquitous language** — names drifting from the domain vocabulary or
    the decompose map's role names. Implementation-flavoured names
    (`Manager`, `Helper`, `Util`, `Impl` leaking into roles) get flagged.
-4. **Doubling boundary (scale-invariant)** — the core smell is **anything
+5. **Doubling boundary (scale-invariant)** — the core smell is **anything
    doubled that the unit-under-test actually owns**, at either radius: a
    faked domain object inside an acceptance test, or a mocked value
    object / pure function / owned calculation inside a unit test — same
@@ -31,12 +35,12 @@ Review against, in order:
    types directly (must be wrapped first); mock setup longer than the
    behaviour it supports; interaction assertions where an outcome
    assertion would do.
-5. **Boundary rule** — UI knows nothing of domain; domain depends on
+6. **Boundary rule** — UI knows nothing of domain; domain depends on
    nothing; infrastructure implements ports. Any arrow pointing the wrong
    way is a finding, even if it works.
-6. **Duplication** — across tests (extract setup) and production code
+7. **Duplication** — across tests (extract setup) and production code
    (name the refactoring move from Fowler's catalogue where one applies).
-7. **Characterisation hygiene** (slice review only) — ugly
+8. **Characterisation hygiene** (slice review only) — ugly
    characterisation tests are FINE; do not propose beautifying them.
    Instead flag ones whose behaviour is now well-understood as distil
    candidates.

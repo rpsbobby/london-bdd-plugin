@@ -23,7 +23,7 @@ describe('OrderService', () => {
     sut = new OrderService(repo)
   })
 
-  it('saves a new order and returns its id', async () => {
+  it('should save a new order and return its id', async () => {
     repo.save = vi.fn().mockResolvedValue('order-123')
     const id = await sut.placeOrder({ item: 'book', qty: 1 })
     expect(repo.save).toHaveBeenCalledWith({ item: 'book', qty: 1 })
@@ -39,7 +39,7 @@ import { buildApp } from '../src/app'   // wires real dependencies
 import { describe, it, expect } from 'vitest'
 
 describe('POST /orders — place order', () => {
-  it('returns 201 with the new order id', async () => {
+  it('should return 201 with the new order id', async () => {
     const app = buildApp()              // no mocks
     const res = await request(app)
       .post('/orders')
@@ -65,7 +65,7 @@ describe('POST /orders — place order', () => {
 from unittest.mock import MagicMock
 from order_service import OrderService
 
-def test_places_order_and_returns_id(mocker):
+def test_should_place_order_and_return_id(mocker):
     repo = MagicMock()
     repo.save.return_value = "order-123"
     sut = OrderService(repo)
@@ -81,7 +81,7 @@ def test_places_order_and_returns_id(mocker):
 from fastapi.testclient import TestClient
 from app import build_app   # wires real dependencies
 
-def test_place_order_returns_201():
+def test_should_place_order_returns_201():
     client = TestClient(build_app())   # no mocks
     response = client.post("/orders", json={"item": "book", "qty": 1})
     assert response.status_code == 201
@@ -101,7 +101,7 @@ def test_place_order_returns_201():
 **Unit test skeleton (Kotlin + MockK):**
 ```kotlin
 @Test
-fun `saves order and returns id`() {
+fun `should save order and return id`() {
     val repo = mockk<OrderRepository>()
     every { repo.save(any()) } returns "order-123"
     val sut = OrderService(repo)
@@ -128,7 +128,7 @@ RSpec.describe OrderService do
   let(:repo) { instance_double(OrderRepository) }
   subject(:sut) { described_class.new(repo) }
 
-  it 'saves the order and returns its id' do
+  it 'should save the order and return its id' do
     allow(repo).to receive(:save).and_return('order-123')
     expect(sut.place_order(item: 'book', qty: 1)).to eq('order-123')
     expect(repo).to have_received(:save).with(item: 'book', qty: 1)
@@ -147,7 +147,7 @@ end
 
 **Unit test skeleton:**
 ```go
-func TestOrderService_PlacesOrderAndReturnsID(t *testing.T) {
+func TestShouldPlaceOrderAndReturnID(t *testing.T) {
     repo := &MockOrderRepository{}
     repo.On("Save", mock.Anything).Return("order-123", nil)
     sut := NewOrderService(repo)

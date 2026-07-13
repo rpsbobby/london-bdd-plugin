@@ -93,9 +93,25 @@ object in a unit test, are the same mistake at different radii.
 
 | Suite | Shape | Command |
 |---|---|---|
-| **Acceptance** | DSL Given/When/Then, business language; doubles external boundaries deliberately (to identify dependencies), internal collaborators stay real; external outcomes only | `/acceptance` |
-| **Unit** | Behaviour-named ("should…"), one behaviour, body ≤ ~10 lines. Double **peers** (roles the class delegates to); keep **owned** behaviour real (value objects, pure functions). See the doubling principle. | `/unit` |
-| **Characterisation** | Records CURRENT behaviour. No DSL forced. **Correctness over readability — ugliness is a signal**, and every eyesore is a distil candidate for later rewrite as a proper unit/acceptance test. The suite is designed to shrink. | `/characterise` |
+| **Acceptance** | DSL Given/When/Then, business language; doubles external boundaries deliberately (to identify dependencies), internal collaborators stay real; external outcomes only. Executable identifier is `should_`-prefixed (see naming convention below). | `/acceptance` |
+| **Unit** | Behaviour-named, `should_`-prefixed, one behaviour, body ≤ ~10 lines. Double **peers** (roles the class delegates to); keep **owned** behaviour real (value objects, pure functions). See the doubling principle. | `/unit` |
+| **Characterisation** | Records CURRENT behaviour. No DSL forced, no naming convention imposed. **Correctness over readability — ugliness is a signal**, and every eyesore is a distil candidate for later rewrite as a proper unit/acceptance test. The suite is designed to shrink. | `/characterise` |
+
+## Test naming convention
+
+Every acceptance and unit test name states the expected behaviour and
+starts with **`should`**:
+
+- Frameworks with no discovery prefix (Vitest/Jest `it()`, RSpec, Kotlin
+  backtick names): `should <behaviour>` — e.g. `it('should return 201 …')`.
+- Frameworks that require a `test_`/`Test` discovery prefix (pytest, Go's
+  `testing` package, JUnit method names): `test_should_<behaviour>` /
+  `TestShould<Behaviour>` — e.g. `def test_should_place_order(...)`.
+
+Gherkin `Scenario:` titles stay pure business language — this convention
+governs the executable identifier wrapping the scenario, not the DSL text.
+Characterisation tests are exempt (see table above) — they record what IS,
+not what should be.
 
 ## Model routing (enforced by agent definitions)
 

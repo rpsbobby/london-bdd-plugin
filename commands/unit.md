@@ -9,8 +9,11 @@ Read the `london-bdd` skill. Language tooling in references.
 
 ## Shape — non-negotiable
 
-- **Behaviour-named**, "should"-style: the name states what is broken and
-  why it matters when it fails. Not DSL-forced — plain test code.
+- **Behaviour-named, `should_`-prefixed**: `should_<behaviour>` (or
+  `test_should_<behaviour>` / `TestShould<Behaviour>` where the framework
+  requires a `test_`/`Test` discovery prefix — pytest, Go, JUnit method
+  names). The name states what is broken and why it matters when it fails.
+  Not DSL-forced — plain test code.
 - **One behaviour per test.** Body target ≤ 10 lines. Over that → the
   behaviour is too big or setup should be extracted.
 - **Double the peers, keep the owned behaviour real** (the doubling

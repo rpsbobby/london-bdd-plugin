@@ -23,7 +23,7 @@ import { buildApp } from '../../src/app'
 import { describe, it, expect } from 'vitest'
 
 describe('POST /orders', () => {
-  it('returns 201 and an orderId when order data is valid', async () => {
+  it('should return 201 and an orderId when order data is valid', async () => {
     const app = buildApp()   // ← real wiring, no mocks
     const res = await request(app)
       .post('/orders')
@@ -59,7 +59,7 @@ describe('OrderHandler', () => {
     handler = new OrderHandler(service)
   })
 
-  it('calls OrderService and returns 201 with orderId', async () => {
+  it('should call OrderService and return 201 with orderId', async () => {
     ;(service.placeOrder as ReturnType<typeof vi.fn>).mockResolvedValue('ord-1')
     const req = { body: { item: 'Clean Code', qty: 2 } } as any
     const res = { status: vi.fn().mockReturnThis(), json: vi.fn() } as any
@@ -116,7 +116,7 @@ describe('DefaultOrderService', () => {
     sut = new DefaultOrderService(repo)
   })
 
-  it('saves the order to the repository and returns the generated id', async () => {
+  it('should save the order to the repository and return the generated id', async () => {
     ;(repo.save as ReturnType<typeof vi.fn>).mockResolvedValue('ord-999')
     const id = await sut.placeOrder({ item: 'Clean Code', qty: 2 })
     expect(repo.save).toHaveBeenCalledWith({ item: 'Clean Code', qty: 2 })
