@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """london-bdd guard hook.
 
-Enforces the three hard rules when a .bdd/session.yml slice is active:
+Enforces the four hard rules when a .bdd/session.yml slice is active:
 
   A. No production edit without a recorded failing test.
   B. In SAFE / FULL_REFACTOR mode, no edit outside the declared scope.
@@ -10,6 +10,13 @@ Enforces the three hard rules when a .bdd/session.yml slice is active:
      `/commit-merge --auto` has dropped a fresh, untracked
      `.bdd/.merge-authorized` marker naming this exact tmp/base branch
      pair (see find_merge_marker). Rebases are never allowed for the agent.
+  D. Phase transitions in session.yml are forward-only and earned (see
+     validate_phase_transition) — checked on Edit/Write/MultiEdit, and on
+     Bash only for the narrow case of a redirect/tee write at that exact
+     path (see bash_targets_session_yml). A human editing the file
+     directly, outside Claude Code entirely, always bypasses every rule
+     here — that's expected: this hook governs the agent's own tool
+     calls, not the developer's own editor.
 
 Note on the marker file: `git checkout <base_branch>` removes
 `.bdd/session.yml` from the working tree (it's tracked only on the tmp
@@ -60,13 +67,16 @@ def find_session(start):
 
 def parse_session(path):
     """Minimal YAML subset parser — avoids a PyYAML dependency."""
-    s = {"mode": None, "branch": None, "base_branch": None,
+    s = {"slice": None, "mode": None, "branch": None, "base_branch": None,
          "current_failing_test": None, "scope_in": [], "scope_out": [],
-         "phase": None, "char_status": None}
+         "phase": None, "char_status": None, "acceptance_status": None,
+         "collaborators": [], "cycle": 0}
     try:
         text = open(path, encoding="utf-8").read()
     except OSError:
         return s
+    m = re.search(r"^slice:\s*(\S+)", text, re.M)
+    if m: s["slice"] = m.group(1)
     m = re.search(r"^mode:\s*(\S+)", text, re.M)
     if m: s["mode"] = m.group(1)
     m = re.search(r"^phase:\s*(\S+)", text, re.M)
@@ -75,6 +85,8 @@ def parse_session(path):
     if m: s["branch"] = m.group(1)
     m = re.search(r"^base_branch:\s*(\S+)", text, re.M)
     if m: s["base_branch"] = m.group(1)
+    m = re.search(r"^cycle:\s*(\d+)", text, re.M)
+    if m: s["cycle"] = int(m.group(1))
     m = re.search(r"^current_failing_test:\s*\n((?:[ \t]+.*\n?)*)", text, re.M)
     if m and re.search(r"\bfile:\s*\S", m.group(1)):
         s["current_failing_test"] = True
@@ -82,6 +94,16 @@ def parse_session(path):
     if m:
         st = re.search(r"\bstatus:\s*(\S+)", m.group(1))
         if st: s["char_status"] = st.group(1)
+    m = re.search(r"^acceptance_test:\s*\n((?:[ \t]+.*\n?)*)", text, re.M)
+    if m:
+        st = re.search(r"\bstatus:\s*(\S+)", m.group(1))
+        if st: s["acceptance_status"] = st.group(1)
+    m = re.search(r"^collaborators:\s*\n((?:[ \t]+.*\n?)*)", text, re.M)
+    if m:
+        for role_m in re.finditer(
+                r"-\s*role:\s*(\S+)\s*\n\s*status:\s*(\S+)", m.group(1)):
+            s["collaborators"].append(
+                {"role": role_m.group(1), "status": role_m.group(2)})
     block = re.search(r"^scope:\s*\n((?:[ \t]+.*\n?)*)", text, re.M)
     if block:
         cur = None
@@ -93,6 +115,83 @@ def parse_session(path):
             if item and cur:
                 s[cur].append(item.group(1).strip("'\""))
     return s
+
+
+PHASE_ORDER = ["characterise", "decompose", "inner", "close", "done"]
+
+
+def extract_new_phase(tool_input):
+    """Pull the phase: value an in-flight edit would write, from whichever
+    shape the tool uses (Write's content, Edit's new_string, MultiEdit's
+    edits[].new_string). Returns None if this edit doesn't touch phase:."""
+    chunks = []
+    if "content" in tool_input:
+        chunks.append(tool_input["content"])
+    if "new_string" in tool_input:
+        chunks.append(tool_input["new_string"])
+    for e in tool_input.get("edits") or []:
+        if "new_string" in e:
+            chunks.append(e["new_string"])
+    text = "\n".join(chunks)
+    m = re.search(r"^phase:\s*(\S+)", text, re.M)
+    return m.group(1) if m else None
+
+
+def validate_phase_transition(s, new_phase):
+    """Rule D: mechanizes session-schema.md's 'phase transitions are
+    forward-only ... commands refuse to run out of order' — without this,
+    that line is just prose the agent is trusted to self-enforce, and
+    .bdd/session.yml is otherwise unguarded (it must stay writable for the
+    commands that legitimately advance it). Returns an error message, or
+    None if the transition is legal. Unrecognized phase values (custom
+    workflows) are waved through — this only polices the documented ones."""
+    old_phase = s["phase"]
+    if new_phase not in PHASE_ORDER:
+        return None
+    if old_phase in PHASE_ORDER and (
+            PHASE_ORDER.index(new_phase) < PHASE_ORDER.index(old_phase)):
+        return (f"Rule D: phase cannot move backward from '{old_phase}' to "
+                f"'{new_phase}'. Phase transitions are forward-only within "
+                "a slice (session-schema.md).")
+
+    if new_phase == "decompose" and s["mode"] in ("SAFE", "FULL_REFACTOR"):
+        if s["char_status"] != "green":
+            return ("Rule D: cannot enter phase 'decompose' — the "
+                    "characterisation net must be green first "
+                    "(/characterise).")
+
+    if new_phase == "inner":
+        if s["mode"] == "GREENFIELD":
+            if not s["collaborators"]:
+                return ("Rule D: cannot enter phase 'inner' with an empty "
+                        "collaborator queue — run /decompose first.")
+            if s["acceptance_status"] != "red":
+                return ("Rule D: cannot enter phase 'inner' — the "
+                        "acceptance test must be recorded red first "
+                        "(/scenario).")
+        elif s["mode"] in ("SAFE", "FULL_REFACTOR"):
+            if s["char_status"] != "green":
+                return ("Rule D: cannot enter phase 'inner' — the "
+                        "characterisation net must be green first "
+                        "(/characterise).")
+
+    if new_phase == "close":
+        if not s["collaborators"]:
+            return ("Rule D: cannot enter phase 'close' with no "
+                    "collaborators recorded — the inner loop queue must be "
+                    "worked and drained first (/inner).")
+        unfinished = [c["role"] for c in s["collaborators"]
+                      if c["status"] != "done"]
+        if unfinished:
+            return ("Rule D: cannot enter phase 'close' — collaborator(s) "
+                     f"still open: {', '.join(unfinished)}. Finish the "
+                     "queue with /inner.")
+
+    if new_phase == "done" and old_phase != "close":
+        return ("Rule D: cannot enter phase 'done' except from 'close' — "
+                "run /review to close the outer loop first.")
+
+    return None
 
 
 MERGE_MARKER = ".merge-authorized"
@@ -148,6 +247,28 @@ def sibling_tmp_branch(cwd, br):
         return None
 
 
+def bash_targets_session_yml(cmd):
+    """True if cmd redirects/tees output at .bdd/session.yml — the way to
+    dodge Rule D's phase-transition check, which only inspects Edit/Write/
+    MultiEdit tool calls. Deliberately narrow: only unambiguous redirect
+    syntax (>, >>, tee) is matched. cp/mv/sed -i/python one-liners are NOT
+    caught here — regexing every way Bash can write a file is a losing
+    arms race and risks false positives on legitimate reads or the
+    documented archive-copy flow. This blocks the accidental case (Claude
+    reaching for a shell one-liner instead of the Edit tool), not a
+    determined adversarial one."""
+    for m in re.finditer(r"(?:>>|>)\s*(\S+)", cmd):
+        target = m.group(1).strip("'\"")
+        if target.replace(os.sep, "/").endswith(".bdd/session.yml"):
+            return True
+    m = re.search(r"\btee\b(?:\s+-\S+)*\s+(\S+)", cmd)
+    if m:
+        target = m.group(1).strip("'\"")
+        if target.replace(os.sep, "/").endswith(".bdd/session.yml"):
+            return True
+    return False
+
+
 def block(msg):
     sys.stderr.write("[london-bdd guard] " + msg + "\n")
     sys.exit(2)
@@ -197,6 +318,12 @@ def main():
 
     if kind == "bash":
         cmd = tool_input.get("command", "")
+        if session_path and bash_targets_session_yml(cmd):
+            block("Rule D: writes to .bdd/session.yml via Bash bypass the "
+                  "phase-transition check — use the Edit or Write tool so "
+                  "the guard can validate the target phase. (Reading or "
+                  "archiving the file via Bash is unaffected; this only "
+                  "blocks redirect/tee writes at that exact path.)")
         if re.search(r"\bgit\s+(commit|merge|rebase)\b", cmd):
             br = git_branch(root)
             sibling = sibling_tmp_branch(root, br)
@@ -239,6 +366,18 @@ def main():
     if not fp:
         sys.exit(0)
     r = rel(fp, root)
+
+    # Rule D — phase-transition gate. Checked even though .bdd/ is
+    # otherwise always-allowed below: session.yml itself must stay
+    # writable for legitimate transitions, but the *value* written must
+    # be an earned one.
+    if r.replace(os.sep, "/") == ".bdd/session.yml":
+        new_phase = extract_new_phase(tool_input)
+        if new_phase and new_phase != s["phase"]:
+            err = validate_phase_transition(s, new_phase)
+            if err:
+                block(err)
+
     if is_always_allowed(r):
         sys.exit(0)  # tests, docs, .bdd, registers are always writable
 

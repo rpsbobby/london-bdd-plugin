@@ -143,7 +143,7 @@ the agent runs the squash-merge itself, authorized fresh every invocation
 — never a persisted "always auto". The guard hook enforces all of this;
 commands check first anyway — commands are polite, hooks are absolute.
 
-## The three hard rules (hook-enforced)
+## The four hard rules (hook-enforced)
 
 - **A.** A production edit requires a license — any one of: a recorded
   failing test in `.bdd/session.yml` (the normal red); phase `close`
@@ -155,6 +155,13 @@ commands check first anyway — commands are polite, hooks are absolute.
   `feature/*-main` are human by default, or agent-run via
   `/commit-merge --auto` with fresh per-run authorization. Rebases are
   always human.
+- **D.** Phase transitions in `.bdd/session.yml` are forward-only and
+  earned, not self-reported: entering `inner` requires the outer net to
+  exist (AT red / characterisation green) and, for GREENFIELD, a
+  non-empty collaborator queue; entering `close` requires every
+  collaborator `done`; entering `done` requires coming from `close`. The
+  guard hook validates the target phase on every edit to session.yml, so
+  a step can't be skipped just by writing the field.
 
 ## Operating rules
 
@@ -165,7 +172,9 @@ commands check first anyway — commands are polite, hooks are absolute.
 5. Run tests after every change; show real output.
 6. Session state lives in `.bdd/session.yml` (see
    `references/session-schema.md`) — read first, update last, trust it
-   over memory.
+   over memory. Unsure what's next? Run `/status` (`scripts/next.py`) —
+   it's a deterministic lookup, not something to re-derive by exploring
+   the repo.
 7. Deviations requested by the user are honoured but noted, with why the
    step matters.
 
@@ -182,6 +191,8 @@ commands check first anyway — commands are polite, hooks are absolute.
 
 ## Reference files
 
+- `/status` — deterministic "what's next" lookup (`scripts/next.py`);
+  run it anytime instead of re-deriving state from the repo
 - `references/session-schema.md` — the state file all commands share
 - `references/scope-template.md` — the refactor scope artifact
 - `references/characterisation.md` — Feathers techniques and probe-first

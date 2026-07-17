@@ -75,5 +75,13 @@ session.yml can carry state across that checkout. See `/commit-merge` and
   (GREENFIELD skips scope/characterise). Commands refuse to run out of
   order and say which command is expected next. `done` is terminal for the
   slice; `/commit-merge` is the only command that still acts on it.
+  This is hook-enforced, not just documented: `scripts/guard.py`'s Rule D
+  validates the target phase on every edit to session.yml — it blocks
+  backward moves and moves into a phase whose precondition isn't actually
+  met yet (e.g. `close` requires every collaborator `done`), so a step
+  can't be skipped by writing the field directly.
+- Don't re-derive "what's next" by exploring the repo — it's a lookup,
+  not a judgment call. Run `/status` (`scripts/next.py`), which parses
+  this file the same way the guard hook does.
 - One slice per session file. New slice = archive old file to
   `.bdd/archive/<slice>.yml`, create fresh.

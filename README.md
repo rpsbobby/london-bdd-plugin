@@ -16,10 +16,12 @@ GREENFIELD                          LEGACY (SAFE / FULL_REFACTOR)
 /london-bdd:review                  /london-bdd:inner (×N) → :review
                                     /london-bdd:characterise (verify)
 /london-bdd:commit-merge            /london-bdd:commit-merge
-Support: /london-bdd:acceptance  /london-bdd:unit  /london-bdd:adr  /london-bdd:debt
+Support: /london-bdd:acceptance  /london-bdd:unit  /london-bdd:adr  /london-bdd:debt  /london-bdd:status
 ```
 
-Every command tells you which one is next when it finishes.
+Every command tells you which one is next when it finishes. Lost track
+mid-slice? Run `/london-bdd:status` — it reads `.bdd/session.yml` and
+prints the next command, no need to remember the diagram above.
 
 ## Command reference
 
@@ -50,6 +52,7 @@ All commands live under the `/london-bdd:` prefix.
 | `/london-bdd:unit` | One failing unit test for the current collaborator — behaviour-named, mocked collaborators, ~10 lines max. Usually via `/inner`. |
 | `/london-bdd:adr` | Records an architecture decision — Context, Decision, Consequences, one page, in `adr/` next to the code. |
 | `/london-bdd:debt` | Logs a `tech-debt/register.yml` entry — for scope-creep temptations, bugs found during characterisation, and every "while we're here". |
+| `/london-bdd:status` | Prints exactly which command runs next, read straight from `.bdd/session.yml` — a deterministic lookup, not something to re-derive from context. |
 
 ## What's enforced (hooks)
 
@@ -61,6 +64,10 @@ All commands live under the `/london-bdd:` prefix.
   `feature/*-main` are human-only by default, or agent-run via
   `/commit-merge --auto` with fresh per-run authorization; rebases and
   pushes are always human.
+- **D.** Phase transitions in `.bdd/session.yml` are forward-only and
+  earned: entering `inner`/`close`/`done` requires the actual
+  preconditions (outer net exists, collaborator queue drained, etc.) —
+  a step can't be skipped just by writing the field.
 
 The guard is silent when no `.bdd/session.yml` slice is active.
 
@@ -152,8 +159,9 @@ Domain glossary: docs/glossary.md (role names must match it)
 commands/                      workflow entry points (thin)
 agents/implementer.md          Haiku, minimum code, no test edits
 agents/reviewer.md             Sonnet, critique only
-hooks/hooks.json + scripts/    the three hard rules
+hooks/hooks.json + scripts/    the four hard rules + next.py (/status)
 tests/test_guard.py            regression suite for the guard hook (pytest)
+tests/test_next.py             regression suite for /status (pytest)
 skills/london-bdd/             knowledge layer + references
 ```
 

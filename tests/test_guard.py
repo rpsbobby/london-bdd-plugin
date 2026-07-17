@@ -204,3 +204,151 @@ def test_silent_for_unrelated_repo_with_no_slice_at_all(repo):
     run_git(repo, "checkout", "-q", "-b", "main-line")
     code, _ = guard(repo, "bash", command="git merge --squash some-other-branch")
     assert code == 0
+
+
+# ---- Rule D: phase transitions can't skip a step ----------------------
+
+def edit_session(repo, new_phase):
+    """Simulate an Edit tool call that rewrites the phase: line in
+    .bdd/session.yml, the way a command would. Fixture state (collaborators,
+    acceptance_test, characterisation) is seeded via open_slice's **extra
+    before this is called."""
+    bdd = repo / ".bdd" / "session.yml"
+    payload = json.dumps({
+        "tool_input": {
+            "file_path": str(bdd),
+            "old_string": "phase: " + _current_phase(bdd),
+            "new_string": f"phase: {new_phase}",
+        },
+        "cwd": str(repo),
+    })
+    proc = subprocess.run(
+        [sys.executable, str(GUARD), "edit"], input=payload,
+        capture_output=True, text=True)
+    return proc.returncode, proc.stderr
+
+
+def _current_phase(session_file):
+    for line in session_file.read_text().splitlines():
+        if line.startswith("phase:"):
+            return line.split(":", 1)[1].strip()
+    return ""
+
+
+def test_blocks_phase_moving_backward(repo):
+    open_slice(repo, "x", phase="inner",
+               **{"collaborators": "\n  - role: A\n    status: done"})
+    code, err = edit_session(repo, "decompose")
+    assert code == 2
+    assert "Rule D" in err
+
+
+def test_blocks_close_with_unfinished_collaborator(repo):
+    open_slice(repo, "x", phase="inner",
+               **{"collaborators": "\n  - role: A\n    status: red"})
+    code, err = edit_session(repo, "close")
+    assert code == 2
+    assert "Rule D" in err
+    assert "A" in err
+
+
+def test_blocks_close_with_no_collaborators(repo):
+    open_slice(repo, "x", phase="inner")
+    code, err = edit_session(repo, "close")
+    assert code == 2
+    assert "Rule D" in err
+
+
+def test_allows_close_when_all_collaborators_done(repo):
+    open_slice(repo, "x", phase="inner",
+               **{"collaborators": "\n  - role: A\n    status: done"})
+    code, _ = edit_session(repo, "close")
+    assert code == 0
+
+
+def test_blocks_inner_greenfield_with_empty_queue(repo):
+    open_slice(repo, "x", phase="decompose", mode="GREENFIELD")
+    code, err = edit_session(repo, "inner")
+    assert code == 2
+    assert "Rule D" in err
+
+
+def test_blocks_inner_greenfield_without_red_acceptance_test(repo):
+    open_slice(repo, "x", phase="decompose", mode="GREENFIELD",
+               **{"collaborators": "\n  - role: A\n    status: pending"})
+    code, err = edit_session(repo, "inner")
+    assert code == 2
+    assert "Rule D" in err
+
+
+def test_allows_inner_greenfield_with_queue_and_red_at(repo):
+    open_slice(repo, "x", phase="decompose", mode="GREENFIELD",
+               **{"collaborators": "\n  - role: A\n    status: pending",
+                  "acceptance_test": "\n  status: red"})
+    code, _ = edit_session(repo, "inner")
+    assert code == 0
+
+
+def test_blocks_inner_safe_without_green_characterisation(repo):
+    open_slice(repo, "x", phase="characterise", mode="SAFE")
+    code, err = edit_session(repo, "inner")
+    assert code == 2
+    assert "Rule D" in err
+
+
+def test_allows_inner_safe_with_green_characterisation(repo):
+    open_slice(repo, "x", phase="characterise", mode="SAFE",
+               **{"characterisation": "\n  status: green"})
+    code, _ = edit_session(repo, "inner")
+    assert code == 0
+
+
+def test_blocks_done_not_from_close(repo):
+    open_slice(repo, "x", phase="inner",
+               **{"collaborators": "\n  - role: A\n    status: done"})
+    code, err = edit_session(repo, "done")
+    assert code == 2
+    assert "Rule D" in err
+
+
+def test_allows_done_from_close(repo):
+    open_slice(repo, "x", phase="close")
+    code, _ = edit_session(repo, "done")
+    assert code == 0
+
+
+# ---- Rule D: Bash can't dodge the phase-transition check --------------
+
+def test_blocks_bash_redirect_write_to_session_yml(repo):
+    open_slice(repo, "x", phase="inner")
+    code, err = guard(repo, "bash",
+                       command="echo 'phase: close' > .bdd/session.yml")
+    assert code == 2
+    assert "Rule D" in err
+
+
+def test_blocks_bash_tee_write_to_session_yml(repo):
+    open_slice(repo, "x", phase="inner")
+    code, err = guard(repo, "bash",
+                       command="echo 'phase: close' | tee .bdd/session.yml")
+    assert code == 2
+    assert "Rule D" in err
+
+
+def test_allows_bash_read_of_session_yml(repo):
+    open_slice(repo, "x", phase="inner")
+    code, _ = guard(repo, "bash", command="cat .bdd/session.yml")
+    assert code == 0
+
+
+def test_allows_bash_redirect_that_does_not_target_session_yml(repo):
+    open_slice(repo, "x", phase="inner")
+    code, _ = guard(repo, "bash",
+                     command="cat .bdd/session.yml > /tmp/session-copy.yml")
+    assert code == 0
+
+
+def test_silent_bash_write_to_session_yml_when_no_active_slice(repo):
+    code, _ = guard(repo, "bash",
+                     command="echo 'phase: inner' > .bdd/session.yml")
+    assert code == 0
