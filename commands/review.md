@@ -18,16 +18,22 @@ feature/<slice>-tmp.
    - GREENFIELD: acceptance test → expect `🟢 AT`. Still red → treat as a
      new inner-loop entry point (missing wiring is the usual cause);
      re-open `phase: inner` with the discovered collaborator.
-   - SAFE/FULL_REFACTOR: run `/characterise` in verification mode.
+   - SAFE/FULL_REFACTOR: re-run the declared net (`net.suites` in
+     session.yml). For a characterisation net, that's `/characterise` in
+     verification mode; for `net.kind: existing`, just run the declared
+     suites and show the output. Either way: green = behaviour preserved;
+     red = STOP and present the diff to the user — intended change or
+     regression is never the agent's call alone.
 3. **Dispatch `london-bdd:reviewer`** with the full slice diff
    (feature/<slice>-tmp vs base). Slice-level concerns: duplication across cycles,
    names drifting from the ubiquitous language, boundary rule violations,
    test suite coherence, anything implemented beyond what tests demand.
    Present proposals; apply accepted ones; keep everything green.
-4. **Distil triage.** Walk `characterisation.distil_candidates`: for each,
-   decide with the user — rewrite now as a proper unit/acceptance test
-   (then delete the ugly one), or log to `/debt` with the insight gained.
-   The characterisation suite should shrink over time.
+4. **Distil triage.** Walk `net.distil_candidates` (characterisation nets
+   only; an existing-suite net has none): for each, decide with the user —
+   rewrite now as a proper unit/acceptance test (then delete the ugly
+   one), or log to `/debt` with the insight gained. The characterisation
+   suite should shrink over time.
 5. **Reflection (from the skill):** any awkward mock (design smell)?
    duplicated setup? happy AND sad path covered?
 6. Final commit on feature/<slice>-tmp. Set `phase: done`.

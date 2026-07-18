@@ -17,7 +17,8 @@ description: >
 ╔══════════════════════════════════════════╗
 ║  OUTER LOOP — the net                    ║
 ║   greenfield : failing acceptance test   ║
-║   refactor   : characterisation suite    ║
+║   refactor   : green net — existing      ║
+║                suite or characterisation ║
 ║        │                                 ║
 ║   ┌─────────────────────────────────┐    ║
 ║   │  INNER LOOP (per collaborator)  │    ║
@@ -36,17 +37,28 @@ Same inner loop, different outer nets. That symmetry is the design.
 ## The two workflows
 
 ```
-GREENFIELD                          SAFE / FULL_REFACTOR (legacy)
-/scenario   discuss, Gherkin, 🔴AT   /refactor-scope  scope, NOT design
-/decompose  collaborators, roles     /characterise    lock in what IS
+GREENFIELD                          SAFE / FULL_REFACTOR (existing code)
+/scenario   discuss, Gherkin, 🔴AT   /refactor-scope  scope + declare net
+/decompose  collaborators, roles     /characterise    ONLY if net gap
 /inner ×N   cycle per collaborator   (/decompose if FULL_REFACTOR)
 /review     slice gate, close loop   /inner ×N  →  /review
-                                     /characterise (verify: still green)
+                                     net re-run (verify: still green)
 /commit-merge   land the slice (both workflows, once phase: done)
 ```
 
 Every command ends by naming the next one — the loop always tells you
 where to go.
+
+**The net is the license; characterisation is only one way to build it.**
+Characterisation-first is a technique for *untested* code. Code already
+covered by trusted behavioural tests (e.g. built through this very loop —
+loosely coupled, outcome-asserting ATs) already HAS its net: the human
+declares those suites the net at `/refactor-scope` (after a real green
+run), `/characterise` is skipped, and refactoring proceeds green-to-green
+on the existing suite. Forcing characterisation onto tested code pins
+implementation behaviour — manufacturing exactly the coupling the outer
+net exists to avoid. Characterisation is required only where coverage is
+missing or untrusted, and only over that gap.
 
 Mode is declared at slice start and recorded in `.bdd/session.yml`.
 Switching modes mid-slice requires an explicit checkpoint with the user.
@@ -147,8 +159,10 @@ commands check first anyway — commands are polite, hooks are absolute.
 
 - **A.** A production edit requires a license — any one of: a recorded
   failing test in `.bdd/session.yml` (the normal red); phase `close`
-  (composition-root wiring); or SAFE mode with a **green** characterisation
-  net (refactoring moves are green-to-green; the net is the license).
+  (composition-root wiring); or SAFE mode with a **green net**
+  (refactoring moves are green-to-green; the net is the license). The
+  net's kind — declared existing suite or characterisation — is recorded
+  in session.yml by the human; the hook checks status, not kind.
 - **B.** In SAFE/FULL_REFACTOR, no edit outside the declared scope.
   "While we're here" → extend scope explicitly or `/debt`.
 - **C.** Agent commits only on `feature/*-tmp`. Merges onto
@@ -157,7 +171,7 @@ commands check first anyway — commands are polite, hooks are absolute.
   always human.
 - **D.** Phase transitions in `.bdd/session.yml` are forward-only and
   earned, not self-reported: entering `inner` requires the outer net to
-  exist (AT red / characterisation green) and, for GREENFIELD, a
+  exist (AT red / net green) and, for GREENFIELD, a
   non-empty collaborator queue; entering `close` requires every
   collaborator `done`; entering `done` requires coming from `close`. The
   guard hook validates the target phase on every edit to session.yml, so

@@ -3,7 +3,13 @@
 
 Enforces the four hard rules when a .bdd/session.yml slice is active:
 
-  A. No production edit without a recorded failing test.
+  A. No production edit without a license: a recorded failing test, phase
+     `close`, or SAFE mode with a green net. The net is declared in
+     session.yml as a `net:` block (kind: existing — trusted suites the
+     scope is already covered by — or kind: characterisation); a legacy
+     `characterisation:` block still counts as a characterisation-kind
+     net. The guard checks status, not kind: which suites constitute the
+     net is the human's declaration at scope time.
   B. In SAFE / FULL_REFACTOR mode, no edit outside the declared scope.
   C. `git commit` only on the slice's feature/<slice>-tmp branch. Merges
      onto feature/<slice>-main are the developer's manual action, unless
@@ -69,7 +75,8 @@ def parse_session(path):
     """Minimal YAML subset parser — avoids a PyYAML dependency."""
     s = {"slice": None, "mode": None, "branch": None, "base_branch": None,
          "current_failing_test": None, "scope_in": [], "scope_out": [],
-         "phase": None, "char_status": None, "acceptance_status": None,
+         "phase": None, "char_status": None, "net_status": None,
+         "net_kind": None, "acceptance_status": None,
          "collaborators": [], "cycle": 0}
     try:
         text = open(path, encoding="utf-8").read()
@@ -94,6 +101,12 @@ def parse_session(path):
     if m:
         st = re.search(r"\bstatus:\s*(\S+)", m.group(1))
         if st: s["char_status"] = st.group(1)
+    m = re.search(r"^net:\s*\n((?:[ \t]+.*\n?)*)", text, re.M)
+    if m:
+        st = re.search(r"\bstatus:\s*(\S+)", m.group(1))
+        if st: s["net_status"] = st.group(1)
+        k = re.search(r"\bkind:\s*(\S+)", m.group(1))
+        if k: s["net_kind"] = k.group(1)
     m = re.search(r"^acceptance_test:\s*\n((?:[ \t]+.*\n?)*)", text, re.M)
     if m:
         st = re.search(r"\bstatus:\s*(\S+)", m.group(1))
@@ -118,6 +131,19 @@ def parse_session(path):
 
 
 PHASE_ORDER = ["characterise", "decompose", "inner", "close", "done"]
+
+
+def net_status(s):
+    """Effective outer-net status for SAFE/FULL_REFACTOR. A `net:` block
+    is authoritative; a legacy `characterisation:` block (pre-net schema)
+    is honoured as a characterisation-kind net. The net's KIND is never
+    checked here — whether existing suites count as the net is the
+    human's declaration at scope time, not the guard's judgment."""
+    return s["net_status"] or s["char_status"]
+
+
+NET_FIX = ("declare the existing green suite as the net (/refactor-scope) "
+           "or build one (/characterise)")
 
 
 def extract_new_phase(tool_input):
@@ -155,10 +181,9 @@ def validate_phase_transition(s, new_phase):
                 "a slice (session-schema.md).")
 
     if new_phase == "decompose" and s["mode"] in ("SAFE", "FULL_REFACTOR"):
-        if s["char_status"] != "green":
-            return ("Rule D: cannot enter phase 'decompose' — the "
-                    "characterisation net must be green first "
-                    "(/characterise).")
+        if net_status(s) != "green":
+            return ("Rule D: cannot enter phase 'decompose' — the outer "
+                    f"net must be green first: {NET_FIX}.")
 
     if new_phase == "inner":
         if s["mode"] == "GREENFIELD":
@@ -170,10 +195,9 @@ def validate_phase_transition(s, new_phase):
                         "acceptance test must be recorded red first "
                         "(/scenario).")
         elif s["mode"] in ("SAFE", "FULL_REFACTOR"):
-            if s["char_status"] != "green":
-                return ("Rule D: cannot enter phase 'inner' — the "
-                        "characterisation net must be green first "
-                        "(/characterise).")
+            if net_status(s) != "green":
+                return ("Rule D: cannot enter phase 'inner' — the outer "
+                        f"net must be green first: {NET_FIX}.")
 
     if new_phase == "close":
         if not s["collaborators"]:
@@ -384,18 +408,20 @@ def main():
     # Rule A — red gate. A production edit is licensed by any ONE of:
     #   1. a recorded failing test (the normal inner-loop red)
     #   2. phase == close (wiring the composition root to close the outer loop)
-    #   3. SAFE mode with a green characterisation net (refactoring moves
-    #      are green-to-green by definition; the net is the license)
+    #   3. SAFE mode with a green net (refactoring moves are green-to-green
+    #      by definition; the net is the license — whether it's a trusted
+    #      existing suite or a characterisation suite is declared in
+    #      session.yml, not decided here)
     licensed = (
         s["current_failing_test"]
         or s["phase"] == "close"
-        or (s["mode"] == "SAFE" and s["char_status"] == "green")
+        or (s["mode"] == "SAFE" and net_status(s) == "green")
     )
     if not licensed:
         block(f"Rule A: production edit to '{r}' is blocked — no license. "
               "Licenses: a failing test in session.yml (/unit, /acceptance), "
               "phase 'close' (composition-root wiring), or SAFE mode with a "
-              "green characterisation net. If this file is not production "
+              f"green net — {NET_FIX}. If this file is not production "
               "code, move it under an allowed path.")
 
     # Rule B — scope gate

@@ -1,20 +1,22 @@
 # london-bdd — London School BDD Double Loop for Claude Code
 
-Outside-in BDD and characterisation-first legacy refactoring as one
+Outside-in BDD and net-first refactoring of existing code as one
 enforced workflow: model-routed agents, scope guards, disciplined
-branching. Operationalises Freeman & Pryce (GOOS), Feathers (WELC),
+branching. The net is the license to change code — a trusted existing
+suite where one exists, a characterisation suite built first where one
+doesn't. Operationalises Freeman & Pryce (GOOS), Feathers (WELC),
 Fowler (Refactoring), Evans (DDD), Martin (Clean Architecture/Code),
 Humble & Farley (CD).
 
 ## Workflows
 
 ```
-GREENFIELD                          LEGACY (SAFE / FULL_REFACTOR)
-/london-bdd:scenario                /london-bdd:refactor-scope
-/london-bdd:decompose               /london-bdd:characterise
+GREENFIELD                          EXISTING CODE (SAFE / FULL_REFACTOR)
+/london-bdd:scenario                /london-bdd:refactor-scope (declares net)
+/london-bdd:decompose               /london-bdd:characterise (only if net gap)
 /london-bdd:inner  (×N)             (/london-bdd:decompose)
 /london-bdd:review                  /london-bdd:inner (×N) → :review
-                                    /london-bdd:characterise (verify)
+                                    net re-run (verify: still green)
 /london-bdd:commit-merge            /london-bdd:commit-merge
 Support: /london-bdd:acceptance  /london-bdd:unit  /london-bdd:adr  /london-bdd:debt  /london-bdd:status
 ```
@@ -32,13 +34,13 @@ All commands live under the `/london-bdd:` prefix.
 | Command | Use when | What it does |
 |---|---|---|
 | `/london-bdd:scenario` | Starting **new** behaviour (greenfield) | Conversation first: agree ubiquitous language, write the Gherkin scenario and the failing acceptance test — the outer red. |
-| `/london-bdd:refactor-scope` | Touching **existing untested** code | Declares the blast radius of a legacy change (what/in/out/seams, SAFE or FULL_REFACTOR mode). Scope only — never solution design. |
+| `/london-bdd:refactor-scope` | Refactoring **existing** code, tested or not | Declares the blast radius (what/in/out/seams, SAFE or FULL_REFACTOR mode) and the net: existing trusted suites (verified green — /characterise skipped) or a characterisation net to build. Scope only — never solution design. |
 
 **The loop** — run in order once a slice is open:
 
 | Command | Phase | What it does |
 |---|---|---|
-| `/london-bdd:characterise` | Legacy, before change | Locks in CURRENT behaviour (right or wrong) as a regression net around the scope. Re-run post-slice to verify behaviour preserved. |
+| `/london-bdd:characterise` | Existing code with a net gap, before change | Locks in CURRENT behaviour (right or wrong) as a regression net around the uncovered scope. Skipped when `/refactor-scope` declared existing suites as the net. Re-run post-slice to verify behaviour preserved. |
 | `/london-bdd:decompose` | Between outer red and inner loop | Discovers collaborators, names roles in DDD language, sketches interface boundaries, agrees the sequence — before any code. |
 | `/london-bdd:inner` | Inner loop, ×N | One full cycle for the next collaborator: failing unit test with you, minimum implementation (implementer agent), review and refactor (reviewer agent), one commit on feature/<slice>-tmp. |
 | `/london-bdd:review` | Collaborator queue empty | Slice-level gate: reviewer agent audits the whole diff, clean-code pass, distil-candidate triage, then closes the outer loop. |
@@ -57,7 +59,9 @@ All commands live under the `/london-bdd:` prefix.
 ## What's enforced (hooks)
 
 - **A.** Production edits need a license: a recorded failing test, OR
-  phase `close` (wiring), OR SAFE mode with a green characterisation net.
+  phase `close` (wiring), OR SAFE mode with a green net — the declared
+  existing suite or a characterisation suite; the hook checks status,
+  not kind.
 - **B.** SAFE/FULL_REFACTOR: no edit outside the declared scope —
   "while we're here" must be explicit or logged to debt.
 - **C.** Agent commits only on `feature/*-tmp`. Merges onto

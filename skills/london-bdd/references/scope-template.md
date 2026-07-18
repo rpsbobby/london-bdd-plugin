@@ -9,6 +9,8 @@ the loop.
 **Mode:** SAFE | FULL_REFACTOR
 **Mandate:** (FULL_REFACTOR only) agreed with <who/when>
 **Driving change:** <the ask, one sentence>
+**Net:** existing — <suites, verified green when/how> |
+         characterisation — <why existing coverage doesn't qualify>
 
 ## In
 - src/pricing/LegacyPricer.cpp        — <why it must change>
@@ -27,6 +29,10 @@ the loop.
 ```
 
 Rules of thumb:
+- **Net** records a judgment, not an inventory: "existing" means the user
+  looked at the suites, agreed they assert outcomes (not implementation),
+  and saw them green — then /characterise is skipped. When in doubt,
+  characterise the doubtful part only.
 - Every "while we're here" temptation lands in **Out** + `/debt`, never
   silently in **In**.
 - More than ~5 files in **In** → challenge the slice size.

@@ -25,11 +25,18 @@ acceptance_test:
   name: PlaceOrder.ReturnsIdAndPersists
   status: red                       # red | green | absent
 
-# SAFE / FULL_REFACTOR — the outer net is the characterisation suite
-characterisation:
-  suite: tests/characterisation/pricing/
+# SAFE / FULL_REFACTOR — the outer net. The NET is the license to change
+# code; characterisation is only one way to build one. If the scope is
+# already covered by trusted behavioural tests (e.g. code built through
+# the double loop), the human declares them the net at /refactor-scope
+# and /characterise is skipped entirely.
+net:
+  kind: characterisation            # existing | characterisation
+  suites:                           # what constitutes the net
+    - tests/characterisation/pricing/
   status: green                     # must be green before any edit in SAFE
   distil_candidates: []             # ugly tests flagged for later rewrite
+                                    # (characterisation kind only)
 
 # Refactor scope (SAFE and FULL_REFACTOR only) — see scope-template.md
 scope:
@@ -70,9 +77,18 @@ session.yml can carry state across that checkout. See `/commit-merge` and
   production-edit hook keys off this field.
 - `scope.in` / `scope.out` use glob patterns relative to project root.
   The scope hook keys off these in SAFE and FULL_REFACTOR modes.
+- `net.kind: existing` records the human's declaration (made at
+  `/refactor-scope`, after a real green run) that the scope is already
+  covered by trusted suites. `net.kind: characterisation` means
+  `/characterise` built the net. The guard checks `net.status` only —
+  the kind is a recorded human judgment, never re-derived. A legacy
+  `characterisation:` block (pre-`net:` schema) is still honoured by
+  the guard as a characterisation-kind net.
 - `phase` transitions are forward-only within a slice:
   `scope → characterise → scenario → decompose → inner → close → done`
-  (GREENFIELD skips scope/characterise). Commands refuse to run out of
+  (GREENFIELD skips scope/characterise; SAFE/FULL_REFACTOR skips
+  characterise when the net is a declared existing suite). Commands
+  refuse to run out of
   order and say which command is expected next. `done` is terminal for the
   slice; `/commit-merge` is the only command that still acts on it.
   This is hook-enforced, not just documented: `scripts/guard.py`'s Rule D

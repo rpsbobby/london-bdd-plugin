@@ -98,6 +98,42 @@ def test_silent_when_no_active_slice(repo):
     assert code == 0
 
 
+def test_allows_safe_edit_licensed_by_green_existing_net(repo):
+    """The net is the license, whatever its kind: a declared existing
+    suite licenses green-to-green refactoring without characterisation."""
+    open_slice(repo, "x", mode="SAFE",
+               **{"net": "\n  kind: existing\n  status: green"})
+    code, _ = guard(repo, "edit", file_path=str(repo / "src" / "order.py"))
+    assert code == 0
+
+
+def test_allows_safe_edit_licensed_by_legacy_characterisation_block(repo):
+    """Pre-net session files (characterisation: block) keep working."""
+    open_slice(repo, "x", mode="SAFE",
+               **{"characterisation": "\n  status: green"})
+    code, _ = guard(repo, "edit", file_path=str(repo / "src" / "order.py"))
+    assert code == 0
+
+
+def test_blocks_safe_edit_when_declared_net_is_not_green(repo):
+    open_slice(repo, "x", mode="SAFE",
+               **{"net": "\n  kind: existing\n  status: absent"})
+    code, err = guard(repo, "edit", file_path=str(repo / "src" / "order.py"))
+    assert code == 2
+    assert "Rule A" in err
+
+
+def test_net_block_overrides_legacy_characterisation_block(repo):
+    """When both blocks exist, net: is authoritative — a red net blocks
+    even if a stale characterisation block still says green."""
+    open_slice(repo, "x", mode="SAFE",
+               **{"net": "\n  kind: characterisation\n  status: red",
+                  "characterisation": "\n  status: green"})
+    code, err = guard(repo, "edit", file_path=str(repo / "src" / "order.py"))
+    assert code == 2
+    assert "Rule A" in err
+
+
 # ---- Rule B: scope gate (SAFE/FULL_REFACTOR) --------------------------
 
 def test_blocks_edit_outside_declared_scope(repo):
@@ -300,6 +336,30 @@ def test_allows_inner_safe_with_green_characterisation(repo):
     open_slice(repo, "x", phase="characterise", mode="SAFE",
                **{"characterisation": "\n  status: green"})
     code, _ = edit_session(repo, "inner")
+    assert code == 0
+
+
+def test_allows_inner_safe_with_green_existing_net(repo):
+    """/refactor-scope declared the existing suites the net — /characterise
+    is skipped and the slice may enter inner directly."""
+    open_slice(repo, "x", phase="characterise", mode="SAFE",
+               **{"net": "\n  kind: existing\n  status: green"})
+    code, _ = edit_session(repo, "inner")
+    assert code == 0
+
+
+def test_blocks_inner_safe_when_existing_net_not_verified_green(repo):
+    open_slice(repo, "x", phase="characterise", mode="SAFE",
+               **{"net": "\n  kind: existing\n  status: absent"})
+    code, err = edit_session(repo, "inner")
+    assert code == 2
+    assert "Rule D" in err
+
+
+def test_allows_decompose_full_refactor_with_green_existing_net(repo):
+    open_slice(repo, "x", phase="characterise", mode="FULL_REFACTOR",
+               **{"net": "\n  kind: existing\n  status: green"})
+    code, _ = edit_session(repo, "decompose")
     assert code == 0
 
 

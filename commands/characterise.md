@@ -1,6 +1,6 @@
 ---
 name: characterise
-description: Build the characterisation net around the declared scope — lock in CURRENT behaviour as a regression suite before any change. Also used post-slice to verify behaviour preserved.
+description: Build the characterisation net around the declared scope's coverage gap — lock in CURRENT behaviour as a regression suite before any change. Not needed when /refactor-scope declared trusted existing suites as the net. Also used post-slice to verify behaviour preserved.
 ---
 
 # /characterise — Lock In What IS, Not What Should Be
@@ -8,8 +8,13 @@ description: Build the characterisation net around the declared scope — lock i
 Read the `london-bdd` skill and `references/characterisation.md`.
 
 A characterisation test records what the code **actually does** — right or
-wrong. It is the outer net for SAFE and FULL_REFACTOR modes, playing the
-role the acceptance test plays in greenfield.
+wrong. It is ONE way to build the outer net for SAFE and FULL_REFACTOR
+modes — the way for code that has no trusted coverage. If `/refactor-scope`
+declared the existing suites as the net (`net.kind: existing`), this
+command has no job: refactoring is licensed by the existing green suite,
+and running /characterise anyway would pin implementation behaviour that
+the loosely coupled net deliberately leaves free. Characterise only the
+gap the scope declaration identified.
 
 ## Preconditions
 
@@ -33,15 +38,16 @@ For each seam declared in scope:
    - Correctness over readability. Hardcoded magic values, long bodies,
      odd setups are ALL acceptable here.
    - **Ugliness is a signal, not a defect.** Every test that hurts to read
-     gets added to `characterisation.distil_candidates` in session.yml —
+     gets added to `net.distil_candidates` in session.yml —
      it marks behaviour that needs a better model distilled later. Do not
      beautify it now.
 4. Tests live in `tests/characterisation/<area>/`. They must run in the
    commit stage locally and are wired into the pipeline's regression gate.
 5. When the net is green and the user agrees it covers the scope:
-   - Update session.yml: `characterisation.status: green`,
-     `phase: decompose` (FULL_REFACTOR) or `phase: inner` (SAFE — small
-     moves may not need formal decomposition; ask the user).
+   - Update session.yml: `net.status: green`
+     (`net.kind: characterisation`), `phase: decompose` (FULL_REFACTOR)
+     or `phase: inner` (SAFE — small moves may not need formal
+     decomposition; ask the user).
    - Commit: `test: characterisation net — <slice>`
    - Tell the user the next command: `/decompose` (FULL_REFACTOR) or
      `/inner` (SAFE).
