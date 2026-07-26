@@ -43,17 +43,24 @@ skill and `references/scope-template.md`.
      be characterised first — `net: {kind: characterisation, status: absent}`.
    Coverage that is implementation-coupled does NOT qualify — a net that
    breaks on refactoring is not a net.
-5. Create branches (`feature/<slice>-main`, `feature/<slice>-tmp`), check
+5. **Ask the autonomy question:** "Run `/decompose` and `/inner` assisted
+   (pause for you at each role and each cycle — default), or autonomous
+   (unattended, stopping only on a blocking review finding, a stalled
+   implementer, or a hook rejection)?" Default to `assisted` on no
+   answer. `/characterise`, `/review`, and `/commit-merge` stay
+   human-paced either way.
+6. Create branches (`feature/<slice>-main`, `feature/<slice>-tmp`), check
    out feature/<slice>-tmp.
-6. Write `.bdd/session.yml` with `mode`, the scope block, branch fields,
-   the `net:` block, and the phase the net decision earned:
+7. Write `.bdd/session.yml` with `mode`, the scope block, branch fields,
+   the `net:` block, `autonomy` from step 5, and the phase the net
+   decision earned:
    - net still to build → `phase: characterise`
    - net existing + green → `phase: inner` (SAFE) or `phase: decompose`
      (FULL_REFACTOR)
-7. Write the human-readable scope artifact to `.bdd/scope-<slice>.md`
+8. Write the human-readable scope artifact to `.bdd/scope-<slice>.md`
    (template in references — include the net declaration and why).
    Commit: `chore: declare refactor scope — <slice>`
-8. Tell the user the next command: `/characterise` if the net must be
+9. Tell the user the next command: `/characterise` if the net must be
    built (**no production edit is possible until the net is green** — the
    hooks enforce this), otherwise `/inner` (SAFE) or `/decompose`
    (FULL_REFACTOR) — the existing green suite is already the license.

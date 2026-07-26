@@ -28,7 +28,10 @@ feature/<slice>-tmp.
    (feature/<slice>-tmp vs base). Slice-level concerns: duplication across cycles,
    names drifting from the ubiquitous language, boundary rule violations,
    test suite coherence, anything implemented beyond what tests demand.
-   Present proposals; apply accepted ones; keep everything green.
+   Present proposals; apply accepted ones; keep everything green. If
+   `autonomy: autonomous` ran any cycles in this slice, this is the first
+   time a human sees them cycle-by-cycle — walk the full diff with the
+   user rather than summarizing, since no per-cycle checkpoint happened.
 4. **Distil triage.** Walk `net.distil_candidates` (characterisation nets
    only; an existing-suite net has none): for each, decide with the user —
    rewrite now as a proper unit/acceptance test (then delete the ugly
@@ -39,4 +42,5 @@ feature/<slice>-tmp.
 6. Final commit on feature/<slice>-tmp. Set `phase: done`.
 7. Tell the user: the slice is closed, next command is `/commit-merge` to
    land it on feature/<slice>-main (manual by default, `--auto` to let the
-   agent run the squash-merge itself).
+   agent run the squash-merge itself). This step is identical whether the
+   slice ran assisted or autonomous — `autonomy` never reaches the merge.

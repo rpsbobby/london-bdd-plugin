@@ -1,6 +1,6 @@
 ---
 name: inner
-description: Run one full inner-loop cycle for the next collaborator — failing unit test (with the user), minimum implementation (implementer agent, Haiku), review and refactor (reviewer agent, Sonnet), one commit on feature/<slice>-tmp. Repeat until the collaborator queue is empty.
+description: Run one full inner-loop cycle for the next collaborator — failing unit test, minimum implementation (implementer agent, Haiku), review and refactor (reviewer agent, Sonnet), one commit on feature/<slice>-tmp. Repeat until the collaborator queue is empty. Paced by session.yml's autonomy field — assisted (default) pauses at each step with the user; autonomous drives the whole queue unattended except for its escalation triggers.
 ---
 
 # /inner — One Cycle: Red → Green → Refactor → Commit
@@ -22,9 +22,13 @@ The orchestrator. Read the `london-bdd` skill first.
 
 ## The cycle
 
-### 1 — RED (you + user, main session)
-Follow `/unit` for the head-of-queue collaborator. Ends with
-`current_failing_test` set and `🔴 UT` announced.
+Read `autonomy` from session.yml first (absent = `assisted`).
+
+### 1 — RED (main session)
+Follow `/unit` for the head-of-queue collaborator — `assisted`: with the
+user, as `/unit` describes. `autonomous`: unattended, per `/unit`'s
+autonomous branch. Either way it ends with `current_failing_test` set
+and `🔴 UT` announced.
 
 ### 2 — GREEN (implementer agent — Haiku)
 Dispatch the `london-bdd:implementer` agent. Context to pass — nothing
@@ -41,8 +45,15 @@ The agent writes the minimum production code, runs the tests, reports.
 Dispatch `london-bdd:reviewer` with the diff of this cycle. It critiques
 (sentence heuristic, naming vs ubiquitous language, duplication, mock
 smells, boundary violations, over-implementation beyond the test) and
-**proposes** refactors. Present the proposals to the user; apply only the
-accepted ones. All tests must stay green. Announce `🔵 Refactor`.
+**proposes** refactors.
+- `assisted`: present the proposals to the user; apply only the accepted
+  ones.
+- `autonomous`: apply `should`/`consider` proposals directly, keeping all
+  tests green. A `block` finding is an escalation trigger (see below) —
+  stop the loop, present it to the user, and wait. Do not apply a fix to
+  a `block` finding on your own judgment.
+
+Announce `🔵 Refactor`.
 
 ### 4 — COMMIT (once per cycle, feature/<slice>-tmp only)
 - Verify branch again (belt and braces — the hook also checks).
@@ -52,10 +63,26 @@ accepted ones. All tests must stay green. Announce `🔵 Refactor`.
   `cycle <n>: <collaborator> — <behaviour>`
 
 ### 5 — NEXT
-Queue non-empty → tell the user `/inner` again for the next collaborator.
-Queue empty → set `phase: close`; tell the user next command is `/review`
-for the slice gate, then close the outer loop (wire the composition root,
-run the AT / characterisation verification).
+- `assisted`: queue non-empty → tell the user `/inner` again for the next
+  collaborator. Queue empty → set `phase: close`; tell the user next
+  command is `/review`.
+- `autonomous`: queue non-empty and no escalation triggered → loop back
+  to step 1 for the next collaborator in the same turn, no waiting for
+  the user to re-invoke `/inner`. Queue empty → set `phase: close`,
+  summarize all cycles run, and tell the user `/review` is next — this
+  gate is unconditional, autonomous or not.
+
+## Escalation triggers — override autonomy, always
+
+Any of these stop an `autonomous` run immediately and hand back to the
+human, exactly as they would interrupt an `assisted` one:
+
+- The implementer stays red after honest attempts within its turns
+  (never loop it blindly, never widen its context to "help" it pass).
+- The reviewer emits a `block`-severity finding.
+- A hook rejects an action (Rules A–D) — this means the loop's own model
+  of state has drifted from the guard's; don't retry blindly.
+- Git state is unexpected (wrong branch, dirty tree, detached HEAD).
 
 ## Hard rules
 
@@ -64,4 +91,5 @@ run the AT / characterisation verification).
 - Squash-merging onto feature/<slice>-main happens via `/commit-merge`,
   after `/review` sets `phase: done` — manual by default, or agent-run in
   `--auto` mode with fresh per-invocation authorization. Never merge
-  directly here.
+  directly here. `autonomy: autonomous` governs `/decompose` and `/inner`
+  only and never reaches this step.

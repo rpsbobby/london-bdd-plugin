@@ -35,8 +35,10 @@ Read the `london-bdd` skill. Language tooling in references.
 1. Check session.yml: `phase: inner`, a collaborator with
    `status: pending|red` at the head of the queue, on feature/<slice>-tmp,
    `current_failing_test` empty (one red at a time — never two).
-2. Confirm with the user which behaviour of the collaborator this test
-   drives.
+2. `autonomy: assisted` — confirm with the user which behaviour of the
+   collaborator this test drives. `autonomy: autonomous` — pick it
+   yourself, outside-in, smallest behaviour that makes progress on the
+   role's interface.
 3. Write the test. Run it; verify it fails for the right reason.
 4. Set `current_failing_test` in session.yml (this unlocks production
    edits for the hook), collaborator `status: red`.

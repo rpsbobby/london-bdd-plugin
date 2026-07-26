@@ -42,11 +42,17 @@ Work through these WITH the user, one at a time:
    (DSL-driven, Given/When/Then, **no mocks, no test doubles of our own
    code**). It must compile and fail for the right reason (behaviour
    absent, not setup error). Run it and show the output.
-4. Create `.bdd/session.yml`:
+4. **Ask the autonomy question:** "Run `/decompose` and `/inner` assisted
+   (pause for you at each role and each cycle — default), or autonomous
+   (I drive the collaborator queue unattended, stopping only on a
+   blocking review finding, a stalled implementer, or a hook rejection)?"
+   Default to `assisted` on no answer. This never applies to this command,
+   to `/review`, or to `/commit-merge` — those stay human-paced either way.
+5. Create `.bdd/session.yml`:
    `mode: GREENFIELD`, `phase: decompose`, `acceptance_test.status: red`,
-   branch fields set, empty collaborator list.
-5. Commit on feature/<slice>-tmp: `test: failing acceptance test — <slice>`
-6. Announce: `🔴 AT: <behaviour>` and tell the user the next command is
+   `autonomy` from step 4, branch fields set, empty collaborator list.
+6. Commit on feature/<slice>-tmp: `test: failing acceptance test — <slice>`
+7. Announce: `🔴 AT: <behaviour>` and tell the user the next command is
    `/decompose`.
 
 ## Rules

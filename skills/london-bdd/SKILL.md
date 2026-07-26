@@ -63,6 +63,20 @@ missing or untrusted, and only over that gap.
 Mode is declared at slice start and recorded in `.bdd/session.yml`.
 Switching modes mid-slice requires an explicit checkpoint with the user.
 
+## Autonomy — opt-in, not default
+
+`/decompose` and `/inner` normally pause for the user at every role name
+and every cycle. Setting `autonomy: autonomous` in `.bdd/session.yml`
+(offered by `/scenario` and `/refactor-scope`, default `assisted`) lets
+the agent drive the whole collaborator queue unattended: name roles,
+pick each behaviour, run red → green → review → commit, cycle after
+cycle, without ending its turn between them. The outer red
+(`/scenario`/`/acceptance`), `/review`, and `/commit-merge` are **never**
+autonomous — landing the slice always stays a separate, human-paced step,
+whether run manually or via `/commit-merge --auto`'s own fresh
+per-invocation authorization. See `references/session-schema.md` for the
+field and its escalation triggers.
+
 ## Core principles (Freeman & Pryce)
 
 - Design emerges **outside-in** — start with behaviour, not data.
@@ -137,8 +151,10 @@ Minimum implementation                          →  implementer agent (Haiku)
 Design critique                                 →  reviewer agent (Sonnet, read-only)
 ```
 
-The human writes/approves every test name and role name. The implementer
-gets one failing test and the interfaces it references — nothing else.
+The human writes/approves every test name and role name — unless
+`autonomy: autonomous` is set, in which case the main session may do
+both unattended. The implementer gets one failing test and the
+interfaces it references — nothing else, in either mode.
 
 ## Branching discipline
 
@@ -191,6 +207,10 @@ commands check first anyway — commands are polite, hooks are absolute.
    the repo.
 7. Deviations requested by the user are honoured but noted, with why the
    step matters.
+8. Autonomy never overrides an escalation trigger: a `block`-severity
+   reviewer finding, an implementer that stays red after honest attempts,
+   or a hook rejection (Rules A–D) all stop the loop and hand back to the
+   human, even in `autonomous` mode.
 
 ## Common failure modes
 

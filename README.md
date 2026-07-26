@@ -83,6 +83,17 @@ The guard is silent when no `.bdd/session.yml` slice is active.
 | Minimum implementation | `implementer` agent (Haiku, can't touch tests) |
 | Design critique | `reviewer` agent (Sonnet, read-only) |
 
+## Autonomy — opt-in
+
+`/decompose` and `/inner` default to `autonomy: assisted`: every role
+name and every cycle pauses for you. Set `autonomy: autonomous` when
+starting a slice (`/scenario` or `/refactor-scope` asks) to let the agent
+drive the whole collaborator queue unattended instead. Three things
+always stop it and hand back to you, in either mode: a `block`-severity
+finding from the reviewer, an implementer that can't reach green, or a
+hook rejection. The outer red, `/review`, and `/commit-merge` are never
+autonomous — see `skills/london-bdd/references/session-schema.md`.
+
 ## Branching
 
 `feature/<slice>-tmp`: one agent commit per cycle (test+impl+refactor),

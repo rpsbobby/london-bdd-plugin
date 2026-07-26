@@ -16,6 +16,7 @@ slice: place-order                  # kebab-case slice name
 mode: GREENFIELD                    # GREENFIELD | SAFE | FULL_REFACTOR
 phase: inner                        # scope | characterise | scenario |
                                     # decompose | inner | close | done
+autonomy: assisted                  # assisted (default) | autonomous
 branch: feature/place-order-tmp     # expected working branch
 base_branch: feature/place-order-main
 
@@ -72,6 +73,21 @@ session.yml can carry state across that checkout. See `/commit-merge` and
 
 ## Field rules
 
+- `autonomy` gates whether `/decompose` and `/inner` pause for the user at
+  each step. `assisted` (the default — assumed when the field is absent,
+  so existing session files behave exactly as before) keeps every
+  checkpoint described in those commands. `autonomous` lets the agent
+  drive role naming and cycle selection unattended. It is set once, at
+  slice start (`/scenario` or `/refactor-scope`), never defaulted to, and
+  never silently upgraded mid-slice — switching requires the same explicit
+  checkpoint as a mode switch. It governs `/decompose` and `/inner` only:
+  `/scenario`, `/acceptance`, `/refactor-scope`, `/review`, and
+  `/commit-merge` are always human-paced regardless of this field (note
+  `/commit-merge --auto` is a separate, per-invocation authorization —
+  `autonomy: autonomous` does not imply it). Three things escalate to the
+  human even in `autonomous` mode: a `reviewer` finding of severity
+  `block`, an implementer that doesn't reach green within its turns, and
+  any hook rejection (Rules A–D) — see `commands/inner.md`.
 - `current_failing_test` is set by `/unit` (or `/acceptance` for the outer
   red) and cleared by the commit step at the end of the cycle. The
   production-edit hook keys off this field.
