@@ -210,6 +210,8 @@ commands check first anyway — commands are polite, hooks are absolute.
 - `references/session-schema.md` — the state file all commands share
 - `references/scope-template.md` — the refactor scope artifact
 - `references/characterisation.md` — Feathers techniques and probe-first
+- `references/approval-testing.md` — golden-master/approval testing and
+  which library to reach for per language
 - `references/collaborator-discovery.md` — role heuristics and naming
 - `references/language-notes.md` — general per-language tooling
 - `references/qt-cpp-notes.md` — Qt/C++ specifics (stub, distil from use)

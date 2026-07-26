@@ -7,6 +7,8 @@
 - Mocking: `vi.fn()` / `jest.fn()`, `vi.spyOn()`
 - Acceptance tests: **Supertest** (HTTP), **Playwright** / **Cypress** (UI)
 - DI: hand-rolled constructor injection or **tsyringe** / **inversify**
+- Approval/golden-master testing (characterisation): built-in Vitest/Jest
+  `toMatchSnapshot()` — see `references/approval-testing.md`
 
 **Unit test skeleton (Vitest):**
 ```ts
@@ -59,6 +61,8 @@ describe('POST /orders — place order', () => {
 - Mocking: `unittest.mock` (`MagicMock`, `patch`), **pytest-mock** (`mocker` fixture)
 - Acceptance tests: **httpx** + **FastAPI TestClient**, or **pytest-bdd** for Gherkin
 - DI: constructor injection; **dependency-injector** lib for larger projects
+- Approval/golden-master testing (characterisation): **syrupy** (pytest
+  snapshots) — see `references/approval-testing.md`
 
 **Unit test skeleton (pytest + pytest-mock):**
 ```python
@@ -97,6 +101,9 @@ def test_should_place_order_returns_201():
 - Mocking: **Mockito** (Java), **MockK** (Kotlin)
 - Acceptance tests: **Spring Boot Test** with `@SpringBootTest`, **REST Assured**
 - DI: Spring or hand-rolled constructor injection
+- Approval/golden-master testing (characterisation): **ApprovalTests
+  Java** (`com.approvaltests:approvaltests`), works unchanged from
+  Kotlin — see `references/approval-testing.md`
 
 **Unit test skeleton (Kotlin + MockK):**
 ```kotlin
@@ -121,6 +128,9 @@ fun `should save order and return id`() {
 - Test runner: **RSpec**
 - Mocking: RSpec built-in doubles (`double`, `instance_double`)
 - Acceptance tests: **RSpec + rack-test** or **Cucumber**
+- Approval/golden-master testing (characterisation): **approvals** gem
+  (Ruby port of ApprovalTests) or **rspec-snapshot** — see
+  `references/approval-testing.md`
 
 **Unit test skeleton:**
 ```ruby
@@ -144,6 +154,9 @@ end
 - Test runner: built-in `testing` package + **testify**
 - Mocking: **mockery** (generates mocks from interfaces), **gomock**
 - Acceptance tests: `net/http/httptest` package
+- Approval/golden-master testing (characterisation): **goldie**
+  (`github.com/sebdah/goldie`) or the plain `testdata/*.golden` + `-update`
+  idiom — see `references/approval-testing.md`
 
 **Unit test skeleton:**
 ```go

@@ -24,8 +24,12 @@
   legacy QWidget (Sprout Class through a seam).
 
 ## Characterisation in C++
-- TODO: golden-master patterns for functions with wide output; approval
-  files vs inline asserts; link-seam tricks of last resort.
+- Golden-master via **ApprovalTests.cpp** for functions with wide
+  output — integrates with the recommended GoogleTest stack. Plain
+  inline asserts stay the default for scalar output; reach for approval
+  files once hand-transcription is the bottleneck. See
+  `references/approval-testing.md`.
+- TODO: link-seam tricks of last resort.
 
 ## Windows port
 - TODO: platform seams discovered during the port (paths, filesystem,

@@ -14,8 +14,11 @@
   given/when/then helpers) — decide on first real acceptance slice.
 
 ## Characterisation
-- TODO: golden-master via approval files (pytest snapshots) for
-  wide-output functions.
+- Golden-master via **syrupy** (pytest-native snapshot plugin) for
+  wide-output functions — `assert value == snapshot`, approve with
+  `pytest --snapshot-update`. Reach for **approvaltests** instead when
+  the reporter's pop-up diff tool is wanted. See
+  `references/approval-testing.md`.
 
 ## Backend-in-Compose
 - TODO: acceptance against the docker-compose stack — fixtures for

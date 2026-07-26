@@ -29,7 +29,13 @@ For each seam declared in scope:
 1. **Probe first.** Write a test with a deliberately wrong assertion, run
    it, and let the failure output reveal the real behaviour. Then lock the
    observed value in. Show the user each discovered behaviour — surprises
-   here are gold.
+   here are gold. For output too large or structured to hand-transcribe
+   (an object graph, a report, a JSON payload) or a combinatorial input
+   sweep, propose an approval-testing library for the project's stack
+   instead of hand-writing the assertion — see
+   `references/approval-testing.md`. Same discipline either way: nothing
+   is locked in until the user has seen it and agreed it's real current
+   behaviour.
 2. **Cover the scope, not the world.** Only behaviour reachable through
    the declared seams. Inputs: typical cases, boundaries, and any case the
    user knows customers hit.

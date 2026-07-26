@@ -19,6 +19,18 @@ TEST(LegacyPricerCharacterisation, CurrentTierBPricing) {
 }
 ```
 
+## Golden master / approval testing — probe-first at scale
+
+For structured or large output (an object graph, a report, a JSON
+payload) or a combinatorial input sweep, hand-transcribing one value at
+a time stops scaling. An approval-testing library automates the
+capture-and-lock-in step: it records the full actual output to a file
+and diffs future runs against it, instead of a hand-written assertion.
+Same probe-first discipline — a captured value is only locked in once
+the human has looked at it and agreed it's real current behaviour — just
+with the tool doing the transcription. See `references/approval-testing.md`
+for the workflow and a framework recommendation per language.
+
 ## Style rules — deliberately relaxed
 
 - No DSL forced; Given/When/Then only if it falls out naturally.
