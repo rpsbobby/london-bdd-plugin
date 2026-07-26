@@ -17,6 +17,11 @@ mode: GREENFIELD                    # GREENFIELD | SAFE | FULL_REFACTOR
 phase: inner                        # scope | characterise | scenario |
                                     # decompose | inner | close | done
 autonomy: assisted                  # assisted (default) | autonomous
+implementer:                        # GREEN-step executor (optional block;
+  backend: agent                    #   absent = agent, same as today)
+  model: gpt-5.6-sol                 # backend: agent (default) | openai —
+                                    # model: only read when backend: openai
+                                    # (see references/implementer-backends.md)
 branch: feature/place-order-tmp     # expected working branch
 base_branch: feature/place-order-main
 
@@ -88,6 +93,20 @@ session.yml can carry state across that checkout. See `/commit-merge` and
   human even in `autonomous` mode: a `reviewer` finding of severity
   `block`, an implementer that doesn't reach green within its turns, and
   any hook rejection (Rules A–D) — see `commands/inner.md`.
+- `implementer.backend` selects the GREEN-step executor `/inner` dispatches:
+  `agent` (the default — absent behaves exactly as before this field
+  existed) runs the `london-bdd:implementer` Haiku subagent; `openai`
+  shells out to `scripts/openai_implementer.py`, which drives an OpenAI
+  model through the same read/write/run-tests/report contract — see
+  `references/implementer-backends.md`. `implementer.model` is the
+  user-facing parameter for which OpenAI model to use (only read when
+  `backend: openai`); change it freely mid-slice, it takes effect on the
+  next `/inner` cycle. `backend` itself follows the same discipline as
+  `autonomy`: set once at slice start (`/scenario` or `/refactor-scope`),
+  never silently upgraded — switching backends mid-slice is an explicit
+  checkpoint with the user. The `openai` backend requires `OPENAI_API_KEY`
+  in the environment; `/inner` stops and asks rather than silently
+  falling back to `agent` if it's missing.
 - `current_failing_test` is set by `/unit` (or `/acceptance` for the outer
   red) and cleared by the commit step at the end of the cycle. The
   production-edit hook keys off this field.

@@ -49,21 +49,28 @@ skill and `references/scope-template.md`.
    implementer, or a hook rejection)?" Default to `assisted` on no
    answer. `/characterise`, `/review`, and `/commit-merge` stay
    human-paced either way.
-6. Create branches (`feature/<slice>-main`, `feature/<slice>-tmp`), check
+6. **Ask the implementer backend question:** "Run the GREEN step with the
+   built-in `agent` backend (Haiku subagent — default), or delegate it to
+   an external `openai` model (needs `OPENAI_API_KEY` set)?" Default to
+   `agent` on no answer. If `openai`, ask which model (default
+   `gpt-5.6-sol` if they don't have a preference). See
+   `references/implementer-backends.md`.
+7. Create branches (`feature/<slice>-main`, `feature/<slice>-tmp`), check
    out feature/<slice>-tmp.
-7. Write `.bdd/session.yml` with `mode`, the scope block, branch fields,
-   the `net:` block, `autonomy` from step 5, and the phase the net
+8. Write `.bdd/session.yml` with `mode`, the scope block, branch fields,
+   the `net:` block, `autonomy` from step 5, `implementer.backend` (and
+   `implementer.model` if `openai`) from step 6, and the phase the net
    decision earned:
    - net still to build → `phase: characterise`
    - net existing + green → `phase: inner` (SAFE) or `phase: decompose`
      (FULL_REFACTOR)
-8. Write the human-readable scope artifact to `.bdd/scope-<slice>.md`
+9. Write the human-readable scope artifact to `.bdd/scope-<slice>.md`
    (template in references — include the net declaration and why).
    Commit: `chore: declare refactor scope — <slice>`
-9. Tell the user the next command: `/characterise` if the net must be
-   built (**no production edit is possible until the net is green** — the
-   hooks enforce this), otherwise `/inner` (SAFE) or `/decompose`
-   (FULL_REFACTOR) — the existing green suite is already the license.
+10. Tell the user the next command: `/characterise` if the net must be
+    built (**no production edit is possible until the net is green** — the
+    hooks enforce this), otherwise `/inner` (SAFE) or `/decompose`
+    (FULL_REFACTOR) — the existing green suite is already the license.
 
 ## Rules
 

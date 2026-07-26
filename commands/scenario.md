@@ -48,11 +48,18 @@ Work through these WITH the user, one at a time:
    blocking review finding, a stalled implementer, or a hook rejection)?"
    Default to `assisted` on no answer. This never applies to this command,
    to `/review`, or to `/commit-merge` — those stay human-paced either way.
-5. Create `.bdd/session.yml`:
+5. **Ask the implementer backend question:** "Run the GREEN step with the
+   built-in `agent` backend (Haiku subagent — default), or delegate it to
+   an external `openai` model (needs `OPENAI_API_KEY` set)?" Default to
+   `agent` on no answer. If `openai`, ask which model (default
+   `gpt-5.6-sol` if they don't have a preference). See
+   `references/implementer-backends.md`.
+6. Create `.bdd/session.yml`:
    `mode: GREENFIELD`, `phase: decompose`, `acceptance_test.status: red`,
-   `autonomy` from step 4, branch fields set, empty collaborator list.
-6. Commit on feature/<slice>-tmp: `test: failing acceptance test — <slice>`
-7. Announce: `🔴 AT: <behaviour>` and tell the user the next command is
+   `autonomy` from step 4, `implementer.backend` (and `implementer.model`
+   if `openai`) from step 5, branch fields set, empty collaborator list.
+7. Commit on feature/<slice>-tmp: `test: failing acceptance test — <slice>`
+8. Announce: `🔴 AT: <behaviour>` and tell the user the next command is
    `/decompose`.
 
 ## Rules
