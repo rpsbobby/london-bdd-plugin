@@ -42,7 +42,7 @@ All commands live under the `/london-bdd:` prefix.
 |---|---|---|
 | `/london-bdd:characterise` | Existing code with a net gap, before change | Locks in CURRENT behaviour (right or wrong) as a regression net around the uncovered scope. Skipped when `/refactor-scope` declared existing suites as the net. Re-run post-slice to verify behaviour preserved. |
 | `/london-bdd:decompose` | Between outer red and inner loop | Discovers collaborators, names roles in DDD language, sketches interface boundaries, agrees the sequence — before any code. |
-| `/london-bdd:inner` | Inner loop, ×N | One full cycle for the next collaborator: failing unit test with you, minimum implementation (implementer backend — Haiku agent by default, or an external `openai` model), review and refactor (reviewer agent), one commit on feature/<slice>-tmp. |
+| `/london-bdd:inner` | Inner loop, ×N | One full cycle for the next collaborator: failing unit test with you, minimum implementation (implementer backend — Haiku agent by default, or OpenAI's Codex CLI via `codex exec`), review and refactor (reviewer agent), one commit on feature/<slice>-tmp. |
 | `/london-bdd:review` | Collaborator queue empty | Slice-level gate: reviewer agent audits the whole diff, clean-code pass, distil-candidate triage, then closes the outer loop. |
 | `/london-bdd:commit-merge` | `phase: done` | Lands the slice: squash-merges feature/<slice>-tmp onto feature/<slice>-main. Manual by default (prints the commands); `--auto` runs the merge itself, authorized fresh each invocation. Never pushes. |
 
@@ -80,25 +80,32 @@ The guard is silent when no `.bdd/session.yml` slice is active.
 | Work | Who |
 |---|---|
 | Scenario, decomposition, unit tests, review decisions | Main session + you |
-| Minimum implementation | implementer backend (can't touch tests): `agent` (Haiku, default) or `openai` (external model) |
+| Minimum implementation | implementer backend (can't touch tests): `agent` (Haiku, default) or `codex` (OpenAI Codex CLI) |
 | Design critique | `reviewer` agent (Sonnet, read-only) |
 
-## Implementer backends — optionally delegate GREEN to an external model
+## Implementer backends — optionally delegate GREEN to Codex CLI
 
 `implementer.backend` in `.bdd/session.yml` picks who does the GREEN step
 of `/inner`. `agent` (default, unset behaves exactly as before) dispatches
-the built-in `london-bdd:implementer` Haiku subagent. `openai` shells out
-to `scripts/openai_implementer.py` instead, which drives an OpenAI model
-(`implementer.model`, default `gpt-5.6-sol`) through the identical
-contract — one failing test in, minimum code out, tests and `.bdd/`
-untouchable — via its own read/write/run-tests/report tool loop, since a
-plain chat-completions model has no native file tools. Requires
-`OPENAI_API_KEY` in the environment; `/inner` stops and asks rather than
-silently falling back to `agent` if it's missing. Both backends are set
-once at slice start (`/scenario` or `/refactor-scope` asks), same
-discipline as `autonomy`. See
-`skills/london-bdd/references/implementer-backends.md` for the full
-contract, and to add a third backend.
+the built-in `london-bdd:implementer` Haiku subagent. `codex` shells out
+to `scripts/codex_implementer.py` instead, which runs `codex exec`
+(OpenAI's Codex CLI) non-interactively in `--sandbox workspace-write`
+mode. Because Codex is already a full coding agent rather than a bare
+model call, the script doesn't mediate its file writes — it snapshots
+`git status` before and after instead, treats any touch to a test file or
+`.bdd/` as a violation that forces escalation rather than a normal red,
+and re-runs the test command itself rather than trusting Codex's own
+claim. `implementer.model`, if set, is passed through as `codex exec
+--model <value>`; leave it unset to use Codex's own configured default.
+Requires the `codex` CLI on `PATH` and already authenticated (`codex
+login`); `/inner` stops and asks rather than silently falling back to
+`agent` if it's missing. Both backends are set once at slice start
+(`/scenario` or `/refactor-scope` asks), same discipline as `autonomy`.
+See `skills/london-bdd/references/implementer-backends.md` for the full
+contract — including why this is a plain CLI call rather than an MCP
+server (Codex ships its own MCP server, `codex mcp-server`, if you
+want Codex available as an ad-hoc tool across a whole session instead)
+— and to add a third backend.
 
 ## Autonomy — opt-in
 
@@ -150,8 +157,9 @@ who clone your work repo are offered it automatically — this is the path
 for "if it works, it should speak for itself."
 
 **Requirements & upkeep:** `python3` on PATH (guard hook). Only needed if
-you opt into `implementer.backend: openai`: `OPENAI_API_KEY` set in the
-environment (no other dependency — the script is stdlib-only). Commands and
+you opt into `implementer.backend: codex`: the `codex` CLI on PATH and
+already authenticated (no other dependency — the script is stdlib-only).
+Commands and
 `SKILL.md` edits apply immediately; changes to hooks or agents need
 `/reload-plugins`. If skills don't appear after install, clear the cache
 (`rm -rf ~/.claude/plugins/cache`), restart, reinstall.
@@ -194,10 +202,10 @@ commands/                      workflow entry points (thin)
 agents/implementer.md          Haiku, minimum code, no test edits
 agents/reviewer.md             Sonnet, critique only
 hooks/hooks.json + scripts/    the four hard rules + next.py (/status)
-scripts/openai_implementer.py  external implementer backend (optional)
+scripts/codex_implementer.py   external implementer backend (optional, Codex CLI)
 tests/test_guard.py            regression suite for the guard hook (pytest)
 tests/test_next.py             regression suite for /status (pytest)
-tests/test_openai_implementer.py  regression suite for the openai backend's path guard
+tests/test_codex_implementer.py  regression suite for the codex backend's violation check
 skills/london-bdd/             knowledge layer + references
 ```
 

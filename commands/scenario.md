@@ -50,14 +50,15 @@ Work through these WITH the user, one at a time:
    to `/review`, or to `/commit-merge` — those stay human-paced either way.
 5. **Ask the implementer backend question:** "Run the GREEN step with the
    built-in `agent` backend (Haiku subagent — default), or delegate it to
-   an external `openai` model (needs `OPENAI_API_KEY` set)?" Default to
-   `agent` on no answer. If `openai`, ask which model (default
-   `gpt-5.6-sol` if they don't have a preference). See
+   the `codex` backend (runs `codex exec`, OpenAI's Codex CLI, non-
+   interactively — needs `codex` on `PATH` and already authenticated)?"
+   Default to `agent` on no answer. If `codex`, ask which model to pass
+   (optional — leave unset to use Codex's own configured default). See
    `references/implementer-backends.md`.
 6. Create `.bdd/session.yml`:
    `mode: GREENFIELD`, `phase: decompose`, `acceptance_test.status: red`,
    `autonomy` from step 4, `implementer.backend` (and `implementer.model`
-   if `openai`) from step 5, branch fields set, empty collaborator list.
+   if `codex`) from step 5, branch fields set, empty collaborator list.
 7. Commit on feature/<slice>-tmp: `test: failing acceptance test — <slice>`
 8. Announce: `🔴 AT: <behaviour>` and tell the user the next command is
    `/decompose`.

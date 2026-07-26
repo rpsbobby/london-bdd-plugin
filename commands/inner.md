@@ -43,14 +43,16 @@ backends satisfy the same contract — see
 `london-bdd:implementer` agent with the context above. It writes the
 minimum production code, runs the tests, reports.
 
-**`backend: openai` — external model.** Confirm `OPENAI_API_KEY` is set
-in the environment first — if it's not, stop and tell the user rather
-than silently falling back to `agent`. Run
-`scripts/openai_implementer.py` via Bash, piping the context as JSON on
-stdin (test file + name, interface file paths, language notes, a
-`test_command` that runs just this test, `implementer.model` from
-session.yml, `cwd`). Read its JSON report from stdout the same way as
-the agent's final message.
+**`backend: codex` — OpenAI Codex CLI.** Confirm `codex` is on `PATH`
+first — if it's not, stop and tell the user rather than silently falling
+back to `agent`. Run `scripts/codex_implementer.py` via Bash, piping the
+context as JSON on stdin (test file + name, interface file paths,
+language notes, a `test_command` that runs just this test,
+`implementer.model` from session.yml if set, `cwd`). Read its JSON report
+from stdout the same way as the agent's final message. If the report's
+`violation` field is non-null (Codex touched a test file or `.bdd/`),
+treat that as a `block`-severity escalation, not a normal red — stop and
+show the user exactly what was touched, do not retry.
 
 Either way:
 - Tests green → announce `🟢 UT: <class> — <behaviour>`.
@@ -96,9 +98,9 @@ Any of these stop an `autonomous` run immediately and hand back to the
 human, exactly as they would interrupt an `assisted` one:
 
 - The GREEN-step backend stays red after honest attempts within its turns
-  (never loop it blindly, never widen its context to "help" it pass), or
-  an external backend exits with a protocol error (e.g. missing
-  `OPENAI_API_KEY`).
+  (never loop it blindly, never widen its context to "help" it pass), an
+  external backend exits with a protocol error (e.g. `codex` missing from
+  `PATH`), or (codex backend) the report's `violation` field is non-null.
 - The reviewer emits a `block`-severity finding.
 - A hook rejects an action (Rules A–D) — this means the loop's own model
   of state has drifted from the guard's; don't retry blindly.
@@ -108,8 +110,10 @@ human, exactly as they would interrupt an `assisted` one:
 
 - One failing test at a time. Never start a new red with one open.
 - The GREEN-step backend NEVER edits test files or session.yml — the
-  `agent` backend by instruction (`agents/implementer.md`), the `openai`
-  backend by its own path guard (`scripts/openai_implementer.py`).
+  `agent` backend by instruction (`agents/implementer.md`), the `codex`
+  backend by its own before/after violation check
+  (`scripts/codex_implementer.py`) since Codex, unlike the agent, isn't
+  mediated file-write-by-file-write.
 - Squash-merging onto feature/<slice>-main happens via `/commit-merge`,
   after `/review` sets `phase: done` — manual by default, or agent-run in
   `--auto` mode with fresh per-invocation authorization. Never merge

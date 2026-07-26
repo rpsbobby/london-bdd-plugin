@@ -51,15 +51,16 @@ skill and `references/scope-template.md`.
    human-paced either way.
 6. **Ask the implementer backend question:** "Run the GREEN step with the
    built-in `agent` backend (Haiku subagent — default), or delegate it to
-   an external `openai` model (needs `OPENAI_API_KEY` set)?" Default to
-   `agent` on no answer. If `openai`, ask which model (default
-   `gpt-5.6-sol` if they don't have a preference). See
+   the `codex` backend (runs `codex exec`, OpenAI's Codex CLI, non-
+   interactively — needs `codex` on `PATH` and already authenticated)?"
+   Default to `agent` on no answer. If `codex`, ask which model to pass
+   (optional — leave unset to use Codex's own configured default). See
    `references/implementer-backends.md`.
 7. Create branches (`feature/<slice>-main`, `feature/<slice>-tmp`), check
    out feature/<slice>-tmp.
 8. Write `.bdd/session.yml` with `mode`, the scope block, branch fields,
    the `net:` block, `autonomy` from step 5, `implementer.backend` (and
-   `implementer.model` if `openai`) from step 6, and the phase the net
+   `implementer.model` if `codex`) from step 6, and the phase the net
    decision earned:
    - net still to build → `phase: characterise`
    - net existing + green → `phase: inner` (SAFE) or `phase: decompose`

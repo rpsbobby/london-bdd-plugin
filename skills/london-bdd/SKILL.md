@@ -149,7 +149,7 @@ not what should be.
 Outer loop, decomposition, unit tests, review  →  main session (Sonnet/Opus) + user
 Minimum implementation                          →  implementer backend:
                                                      agent (default, Haiku) |
-                                                     openai (external model)
+                                                     codex (OpenAI Codex CLI)
 Design critique                                 →  reviewer agent (Sonnet, read-only)
 ```
 
@@ -159,7 +159,7 @@ both unattended. The implementer gets one failing test and the
 interfaces it references — nothing else, in either mode, regardless of
 which backend runs it (see `references/implementer-backends.md`).
 `implementer.backend` in session.yml picks the executor — `agent`
-(default) or `openai`, set once at slice start like `autonomy`.
+(default) or `codex`, set once at slice start like `autonomy`.
 
 ## Branching discipline
 
@@ -239,7 +239,7 @@ commands check first anyway — commands are polite, hooks are absolute.
   which library to reach for per language
 - `references/collaborator-discovery.md` — role heuristics and naming
 - `references/implementer-backends.md` — the GREEN-step executor
-  contract shared by the `agent` and `openai` backends
+  contract shared by the `agent` and `codex` backends
 - `references/language-notes.md` — general per-language tooling
 - `references/qt-cpp-notes.md` — Qt/C++ specifics (stub, distil from use)
 - `references/python-notes.md` — Python specifics (stub, distil from use)

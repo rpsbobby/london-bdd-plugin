@@ -39,21 +39,37 @@ bash tools; `/inner` dispatches it with the context and reads its final
 message as the report. This is the only backend available before this
 feature — absent `implementer.backend`, sessions behave exactly as before.
 
-## `backend: openai` — external model
+## `backend: codex` — OpenAI Codex CLI
 
-`scripts/openai_implementer.py` drives an OpenAI chat-completions model
-through the same contract. Because that model has no tools of its own,
-the script IS the tool loop: it hands the model four function-call tools
-— `read_file`, `write_file`, `run_tests`, `report` — and executes them
-locally, feeding results back until `report` is called or `max_turns`
-(default 10) runs out.
+`scripts/codex_implementer.py` delegates the GREEN step to `codex exec`
+(OpenAI's Codex CLI, run non-interactively). Codex is not a bare
+chat-completions model — it's already a full coding agent that reads and
+writes files and runs shell commands on its own inside its own sandbox.
+That changes the shape of the wrapper: there is no tool loop to drive
+(there's nothing to loop), so the script's job is to launch one turn
+safely and verify the aftermath rather than mediate every file write:
 
-`write_file` enforces rules 1–2 itself, in code, not just by instruction:
-it refuses the exact test-file path plus anything under `tests/`, `test/`,
-`.bdd/`, or matching common test-name patterns (`test_*`, `*_test`,
-`*.test.*`, `*Test.java`, `spec.*`). A refusal is returned to the model as
-a tool result, the same way a compiler error would be — the model sees it
-and corrects course, it isn't a hard crash.
+1. Snapshot `git status --porcelain`, plus a hash of the failing test
+   file's own content, BEFORE the run. (The RED step usually leaves the
+   tree dirty with just that one file — this is expected, not a
+   precondition failure.)
+2. Run `codex exec --sandbox workspace-write "<prompt>"` — `workspace-write`
+   lets Codex edit repo files without an interactive approval prompt, but
+   stops well short of `--dangerously-bypass-approvals-and-sandbox` (no
+   network access, nothing outside the workspace). The prompt embeds the
+   same six absolute rules above plus the context (test, interfaces,
+   language notes, the exact `test_command` to run).
+3. Snapshot again AFTER. Any newly-touched path under a protected pattern
+   (`tests/`, `test/`, `.bdd/`, or a test-name pattern like `*_test.*`,
+   `*Test.java`, `*.test.*`), or any change to the test file's own hash,
+   is a **violation** — Codex's own "tests pass" claim is not trusted in
+   that case. The script reports `status: red` with a `violation` block
+   naming the offending paths, and `/inner` must escalate to the human
+   exactly as it would for a `block`-severity reviewer finding — this is
+   not a normal red to retry.
+4. Absent a violation, the script re-runs `test_command` **itself** — it
+   never trusts Codex's internal narration of whether tests passed — and
+   reports green/red from that exit code.
 
 **stdin contract** (JSON):
 ```json
@@ -63,37 +79,50 @@ and corrects course, it isn't a hard crash.
   "interfaces": ["src/pricing/OrderRepository.h"],
   "language_notes": "<relevant excerpt from references/language-notes.md>",
   "test_command": "ctest -R OrderRepository.SavesAndReturnsId",
-  "model": "gpt-4.1",
-  "max_turns": 10,
+  "model": null,
+  "timeout_seconds": 600,
   "cwd": "/abs/path/to/repo"
 }
 ```
+`model`, if set, is passed straight through as `codex exec --model
+<value>`; if absent, Codex uses whatever model its own config
+(`~/.codex/config.toml`) already defaults to — this script does not
+hardcode one.
 
 **stdout contract** (JSON):
 ```json
-{"status": "green", "summary": "...", "files_changed": ["src/pricing/OrderRepository.cpp"], "turns_used": 4}
+{"status": "green", "summary": "...", "files_changed": ["src/pricing/OrderRepository.cpp"], "violation": null}
 ```
-
-Exit code 0 covers both a green result and an honest red (that's a normal
-`/inner` escalation, not a script failure); exit code 1 means a
-configuration/protocol error (bad JSON, missing key, unreachable API) —
-`/inner` treats that as a hard stop, not a red test, and hands back to
-the human immediately rather than retrying.
+Exit code 0 covers a green result, an honest red, and a caught violation
+(all normal `/inner` outcomes); exit code 1 means a configuration/protocol
+error (`codex` not on PATH, bad stdin JSON, `git status` itself failing,
+or `codex exec` timing out) — `/inner` treats that as a hard stop, not a
+red test.
 
 **Setup:**
-- `OPENAI_API_KEY` must be set in the environment. If it's missing,
-  `/inner` stops and tells the user rather than silently falling back to
-  the `agent` backend — a silent fallback would mean tests run against
-  the wrong model without anyone deciding that.
-- `implementer.model` in session.yml overrides the default (`gpt-4.1`).
-- No third-party Python packages required — stdlib `urllib` only, same
-  reasoning as `guard.py` avoiding a PyYAML dependency.
+- The `codex` CLI must be on `PATH` and already authenticated (`codex
+  login`, or however your org provisions it) — this plugin does not
+  manage Codex credentials.
+- `implementer.model` in session.yml is optional; see above.
+- No third-party Python packages required — stdlib only (`subprocess`,
+  `hashlib`, `json`), same reasoning as `guard.py` avoiding a PyYAML
+  dependency.
+
+**Why not MCP?** Codex ships its own MCP server (`codex mcp-server`), so
+if you wanted Claude to have Codex available as an ad-hoc tool across a
+whole session, you would register that server rather than write your
+own. But `/inner`'s GREEN step is a single bounded task with a clear
+pass/fail contract, invoked from a script that already knows exactly what
+to pass in and how to verify the result — a plain `codex exec` subprocess
+call is simpler than standing up and managing an MCP server connection
+for one shot-in-the-dark turn, and it's what the `agent` backend's own
+Bash-based dispatch already looks like.
 
 ## Adding another backend
 
 The interface is intentionally small enough that a third backend (a
-different provider, a local model via Ollama, a CLI agent like `aider`)
-is a new script satisfying the same stdin/stdout JSON contract, plus a
-new `implementer.backend` value wired into `/inner`'s GREEN step. It does
-not require touching `agents/implementer.md`, `scripts/guard.py`, or the
-`agent` backend at all.
+different provider's CLI, a local model via Ollama, a raw API-calling
+script) is a new script satisfying the same stdin/stdout JSON contract,
+plus a new `implementer.backend` value wired into `/inner`'s GREEN step.
+It does not require touching `agents/implementer.md`, `scripts/guard.py`,
+or any other backend.
