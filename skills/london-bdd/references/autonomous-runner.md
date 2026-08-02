@@ -131,6 +131,41 @@ not to be supported by your harness version, this design needs revisiting
 was a deliberately rejected alternative (see above), not a safe fallback to
 reach for quietly.
 
+## Why the runner doesn't stop at every tool-call prompt
+
+Everything above describes the *workflow's* pacing — RED/GREEN/REVIEW/
+COMMIT decisions the runner makes on its own judgment. But the runner's
+Edit, Write, and Bash calls still pass through Claude Code's own
+permission system underneath that, independent of anything this plugin
+says about pacing. `scripts/guard.py` runs as a `PreToolUse` hook on every
+one of those calls (session-wide, including inside nested `implementer`/
+`reviewer` dispatches — plugin hooks fire for subagent tool calls the same
+way they do for the main session's) and, historically, only ever did two
+things: block a Rules A-D violation (exit 2), or say nothing at all (exit
+0, no decision) — which still falls through to the interactive approval
+prompt. That silence meant an `autonomous` session got asked to
+approve/accept every single change exactly like an `assisted` one would,
+which defeats the entire point of dispatching an unattended runner.
+
+The fix: once an action has survived Rules A-D, the guard checks
+session.yml's `autonomy` field itself. `assisted` → stays silent, same as
+always (a human is expected to be watching and the interactive prompt is
+the actual pause point, not just prose asking the agent to pause).
+`autonomous` → emits an explicit `permissionDecision: allow` on stdout,
+which Claude Code honours as licensing that call without a prompt. Rules
+A-D are not relaxed by this — a `block`-severity Rule A/B/C/D violation
+still exits 2 regardless of `autonomy`, same as ever; this only removes
+the prompt for what the rules already license. See `scripts/guard.py`'s
+`allow_explicitly()` / `allow_silently()` and `tests/test_guard.py`'s
+"autonomy: autonomous" section.
+
+`permissionMode` in individual agent frontmatter (e.g. `agents/runner.md`)
+would have been the more obvious lever, but plugin subagents don't support
+that frontmatter field at all — Claude Code silently ignores it when an
+agent is loaded from a plugin rather than `.claude/agents/`. The
+plugin-level `hooks/hooks.json` mechanism doesn't have that restriction,
+which is why the fix lives in the guard hook rather than agent frontmatter.
+
 ## Adding to / changing this contract
 
 `commands/inner.md` steps 1-4 describe the identical algorithm for

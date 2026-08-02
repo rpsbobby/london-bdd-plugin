@@ -93,7 +93,16 @@ session.yml can carry state across that checkout. See `/commit-merge` and
   `autonomy: autonomous` does not imply it). Three things escalate to the
   human even in `autonomous` mode: a `reviewer` finding of severity
   `block`, an implementer that doesn't reach green within its turns, and
-  any hook rejection (Rules A–D) — see `commands/inner.md`.
+  any hook rejection (Rules A–D) — see `commands/inner.md`. This field
+  also changes what `scripts/guard.py` does at the point it would
+  otherwise stay silent: `assisted` sessions fall through to Claude Code's
+  normal interactive approval prompt on every Edit/Write/Bash call (the
+  guard has always only ever blocked or said nothing); `autonomous`
+  sessions get an explicit PreToolUse `allow` decision instead, once an
+  action has already survived Rules A–D — so a licensed unattended run
+  isn't still stopped for a human to click "approve" on every single
+  change. Rules A–D are never relaxed by this; it only removes the prompt
+  for what they already license.
 - `implementer.backend` selects the GREEN-step executor `/inner` dispatches:
   `agent` (the default — absent behaves exactly as before this field
   existed) runs the `london-bdd:implementer` Haiku subagent; `codex` shells

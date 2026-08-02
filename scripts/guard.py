@@ -76,7 +76,7 @@ def parse_session(path):
     s = {"slice": None, "mode": None, "branch": None, "base_branch": None,
          "current_failing_test": None, "scope_in": [], "scope_out": [],
          "phase": None, "char_status": None, "net_status": None,
-         "net_kind": None, "acceptance_status": None,
+         "net_kind": None, "acceptance_status": None, "autonomy": None,
          "collaborators": [], "cycle": 0}
     try:
         text = open(path, encoding="utf-8").read()
@@ -86,6 +86,8 @@ def parse_session(path):
     if m: s["slice"] = m.group(1)
     m = re.search(r"^mode:\s*(\S+)", text, re.M)
     if m: s["mode"] = m.group(1)
+    m = re.search(r"^autonomy:\s*(\S+)", text, re.M)
+    if m: s["autonomy"] = m.group(1)
     m = re.search(r"^phase:\s*(\S+)", text, re.M)
     if m: s["phase"] = m.group(1)
     m = re.search(r"^branch:\s*(\S+)", text, re.M)
@@ -298,6 +300,32 @@ def block(msg):
     sys.exit(2)
 
 
+def allow_silently():
+    """The guard has nothing to say: no active slice, or the action falls
+    outside what this guard governs. Falls through to Claude Code's normal
+    permission flow — unchanged behaviour for a human-paced (`assisted`)
+    session."""
+    sys.exit(0)
+
+
+def allow_explicitly():
+    """The guard actively licenses this action under session.yml's
+    `autonomy: autonomous` — emit an explicit PreToolUse `allow` decision so
+    the interactive approval prompt is skipped. Every rule above (A-D) still
+    ran first; this only fires once an action has already survived them, so
+    an autonomous run is unattended for licensed work while still stopping
+    dead on anything Rules A-D reject."""
+    print(json.dumps({
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "allow",
+            "permissionDecisionReason":
+                "london-bdd guard: licensed under autonomy: autonomous",
+        }
+    }))
+    sys.exit(0)
+
+
 def rel(path, root):
     try:
         return os.path.relpath(os.path.abspath(path), root)
@@ -339,6 +367,11 @@ def main():
     s = parse_session(session_path) if session_path else None
     marker, marker_root = find_merge_marker(cwd)
     root = session_root or marker_root or os.path.abspath(cwd)
+    # Only ever true with an active session declaring it explicitly — a
+    # missing/assisted session always falls through to allow_silently(),
+    # preserving today's per-call prompting for human-paced runs.
+    autonomous = bool(s and s["autonomy"] == "autonomous")
+    finish = allow_explicitly if autonomous else allow_silently
 
     if kind == "bash":
         cmd = tool_input.get("command", "")
@@ -381,7 +414,8 @@ def main():
                           "tmp branch, while checked out on its "
                           "base_branch, with an exact "
                           "'git merge --squash <tmp>'.")
-        sys.exit(0)
+        finish()  # no objection — allow silently (assisted) or explicitly
+                  # (autonomous), same rules either way
 
     # kind == "edit"
     if not session_path:
@@ -403,7 +437,7 @@ def main():
                 block(err)
 
     if is_always_allowed(r):
-        sys.exit(0)  # tests, docs, .bdd, registers are always writable
+        finish()  # tests, docs, .bdd, registers are always writable
 
     # Rule A — red gate. A production edit is licensed by any ONE of:
     #   1. a recorded failing test (the normal inner-loop red)
@@ -434,7 +468,8 @@ def main():
             block(f"Rule B ({s['mode']}): '{r}' is outside the declared "
                   "scope. Extend scope explicitly or log to /debt — no "
                   "silent 'while we're here'.")
-    sys.exit(0)
+    finish()  # survived Rules A-D — allow silently (assisted) or explicitly
+              # (autonomous)
 
 
 if __name__ == "__main__":

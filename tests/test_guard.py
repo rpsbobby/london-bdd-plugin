@@ -38,7 +38,7 @@ def write_marker(repo, branch, base_branch):
         f"branch: {branch}\nbase_branch: {base_branch}\n")
 
 
-def guard(repo, kind, command=None, file_path=None):
+def guard_full(repo, kind, command=None, file_path=None):
     tool_input = {}
     if command is not None:
         tool_input["command"] = command
@@ -48,7 +48,13 @@ def guard(repo, kind, command=None, file_path=None):
     proc = subprocess.run(
         [sys.executable, str(GUARD), kind], input=payload,
         capture_output=True, text=True)
-    return proc.returncode, proc.stderr
+    return proc.returncode, proc.stderr, proc.stdout
+
+
+def guard(repo, kind, command=None, file_path=None):
+    code, err, _stdout = guard_full(repo, kind, command=command,
+                                     file_path=file_path)
+    return code, err
 
 
 @pytest.fixture
@@ -412,3 +418,77 @@ def test_silent_bash_write_to_session_yml_when_no_active_slice(repo):
     code, _ = guard(repo, "bash",
                      command="echo 'phase: inner' > .bdd/session.yml")
     assert code == 0
+
+
+# ---- autonomy: autonomous — explicit allow, not just silence ----------
+#
+# `assisted` sessions rely on Claude Code's normal permission prompt for
+# every Edit/Write/Bash call — the guard only ever blocks or stays silent.
+# `autonomy: autonomous` means nobody is there to answer that prompt mid
+# -run, so once an action survives Rules A-D the guard must say so
+# explicitly (a PreToolUse `allow` decision on stdout), not just decline to
+# object.
+
+def test_licensed_edit_stays_silent_when_assisted(repo):
+    open_slice(repo, "x", current_failing_test="\n  file: t.py\n  name: t")
+    code, _err, out = guard_full(repo, "edit",
+                                  file_path=str(repo / "src" / "order.py"))
+    assert code == 0
+    assert out == ""
+
+
+def test_licensed_edit_explicitly_allowed_when_autonomous(repo):
+    open_slice(repo, "x", autonomy="autonomous",
+               current_failing_test="\n  file: t.py\n  name: t")
+    code, _err, out = guard_full(repo, "edit",
+                                  file_path=str(repo / "src" / "order.py"))
+    assert code == 0
+    decision = json.loads(out)
+    assert decision["hookSpecificOutput"]["permissionDecision"] == "allow"
+
+
+def test_always_allowed_path_explicitly_allowed_when_autonomous(repo):
+    open_slice(repo, "x", autonomy="autonomous")
+    code, _err, out = guard_full(
+        repo, "edit", file_path=str(repo / "tests" / "unit" / "x_test.py"))
+    assert code == 0
+    decision = json.loads(out)
+    assert decision["hookSpecificOutput"]["permissionDecision"] == "allow"
+
+
+def test_unlicensed_edit_still_blocked_when_autonomous(repo):
+    """autonomy: autonomous licenses nothing by itself — Rule A still
+    gates production edits on a recorded failing test."""
+    open_slice(repo, "x", autonomy="autonomous")
+    code, err = guard(repo, "edit", file_path=str(repo / "src" / "order.py"))
+    assert code == 2
+    assert "Rule A" in err
+
+
+def test_bash_explicitly_allowed_when_autonomous(repo):
+    open_slice(repo, "x", autonomy="autonomous")
+    code, _err, out = guard_full(repo, "bash", command="git commit -m cycle")
+    assert code == 0
+    decision = json.loads(out)
+    assert decision["hookSpecificOutput"]["permissionDecision"] == "allow"
+
+
+def test_rebase_still_blocked_when_autonomous(repo):
+    """Rules A-D are never relaxed by autonomy — it only removes the
+    prompt for what the rules already license."""
+    main_br, tmp_br = open_slice(repo, "x", phase="done", autonomy="autonomous")
+    write_marker(repo, tmp_br, main_br)
+    run_git(repo, "checkout", "-q", main_br)
+    code, err = guard(repo, "bash", command="git rebase feature/x-tmp")
+    assert code == 2
+    assert "rebase" in err.lower()
+
+
+def test_no_active_slice_stays_silent_even_if_command_mentions_autonomous(repo):
+    """Autonomy is a session.yml field — with no session at all there is
+    nothing to declare it, so behaviour is unchanged (silent, not allow)."""
+    (repo / "src").mkdir()
+    code, _err, out = guard_full(repo, "edit",
+                                  file_path=str(repo / "src" / "order.py"))
+    assert code == 0
+    assert out == ""
