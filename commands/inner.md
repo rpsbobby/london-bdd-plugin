@@ -24,6 +24,29 @@ The orchestrator. Read the `london-bdd` skill first.
 
 Read `autonomy` from session.yml first (absent = `assisted`).
 
+### Autonomous mode — execution mechanism
+
+`autonomy: autonomous`: dispatch the `london-bdd:runner` agent once (repo
+root, slice name, `.bdd/session.yml` path — nothing else, it reads the rest
+itself) and stop. Do NOT run steps 1-5 below inline — `runner` restates
+that same algorithm for its own self-contained context (it can't invoke
+slash commands), so this is a hand-off, not a duplication of effort within
+this turn. See `skills/london-bdd/references/autonomous-runner.md` for the
+full contract and why: in short, draining a whole collaborator queue inside
+one continuous main-session turn means every cycle's diff and reviewer
+critique accumulates before the harness's between-turn compaction ever
+runs; an isolated subagent keeps that off the main session's transcript.
+
+When `runner` returns, present its completed/escalated report to the user
+verbatim (or lightly formatted) and stop — do not re-loop `/inner`
+yourself; if it escalated, the report already names the concrete next
+step. `runner`'s own escalation triggers are the same list in "Escalation
+triggers" below, plus one runner-specific `turn-budget` trigger it uses to
+avoid running out of turns mid-cycle.
+
+`autonomy: assisted` (or absent): continue with steps 1-5 below, exactly
+as documented — unchanged by any of this.
+
 ### 1 — RED (main session)
 Follow `/unit` for the head-of-queue collaborator — `assisted`: with the
 user, as `/unit` describes. `autonomous`: unattended, per `/unit`'s
@@ -82,20 +105,23 @@ Announce `🔵 Refactor`.
 - Commit test + impl + refactor + session.yml together:
   `cycle <n>: <collaborator> — <behaviour>`
 
-### 5 — NEXT
-- `assisted`: queue non-empty → tell the user `/inner` again for the next
-  collaborator. Queue empty → set `phase: close`; tell the user next
-  command is `/review`.
-- `autonomous`: queue non-empty and no escalation triggered → loop back
-  to step 1 for the next collaborator in the same turn, no waiting for
-  the user to re-invoke `/inner`. Queue empty → set `phase: close`,
-  summarize all cycles run, and tell the user `/review` is next — this
-  gate is unconditional, autonomous or not.
+### 5 — NEXT (assisted only — `runner` has its own loop-or-stop step for
+autonomous mode, see above)
+Queue non-empty → tell the user `/inner` again for the next collaborator.
+Queue empty → set `phase: close`; tell the user next command is `/review`
+— this gate is unconditional, assisted or autonomous.
 
 ## Escalation triggers — override autonomy, always
 
 Any of these stop an `autonomous` run immediately and hand back to the
-human, exactly as they would interrupt an `assisted` one:
+human, exactly as they would interrupt an `assisted` one. `agents/runner.md`
+restates this same list (plus one runner-specific `turn-budget` trigger)
+for its own unattended context — when the queue is draining inside
+`runner`, "hand back to the human" means the runner stops its internal
+loop and returns an escalation report (there's no user to interactively
+pause for mid-turn inside a subagent); the main session then presents that
+report to the user, same effect as an `assisted` pause, different
+mechanism:
 
 - The GREEN-step backend stays red after honest attempts within its turns
   (never loop it blindly, never widen its context to "help" it pass), an

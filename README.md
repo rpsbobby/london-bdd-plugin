@@ -82,6 +82,7 @@ The guard is silent when no `.bdd/session.yml` slice is active.
 | Scenario, decomposition, unit tests, review decisions | Main session + you |
 | Minimum implementation | implementer backend (can't touch tests): `agent` (Haiku, default) or `codex` (OpenAI Codex CLI) |
 | Design critique | `reviewer` agent (Sonnet, read-only) |
+| Unattended queue drain (`autonomy: autonomous` only) | `runner` agent (Sonnet, dispatches `implementer`+`reviewer` each cycle) |
 
 ## Implementer backends — optionally delegate GREEN to Codex CLI
 
@@ -117,6 +118,12 @@ always stop it and hand back to you, in either mode: a `block`-severity
 finding from the reviewer, an implementer that can't reach green, or a
 hook rejection. The outer red, `/review`, and `/commit-merge` are never
 autonomous — see `skills/london-bdd/references/session-schema.md`.
+
+The unattended drive itself runs inside a dedicated `runner` subagent,
+dispatched once by `/inner` rather than looping inline in the main
+session — same behaviour, same escalation triggers, kept off the main
+session's own context window. See
+`skills/london-bdd/references/autonomous-runner.md`.
 
 ## Branching
 
@@ -201,6 +208,8 @@ Domain glossary: docs/glossary.md (role names must match it)
 commands/                      workflow entry points (thin)
 agents/implementer.md          Haiku, minimum code, no test edits
 agents/reviewer.md             Sonnet, critique only
+agents/runner.md               Sonnet, drives an autonomous queue drain,
+                                nest-dispatches implementer + reviewer
 hooks/hooks.json + scripts/    the four hard rules + next.py (/status)
 scripts/codex_implementer.py   external implementer backend (optional, Codex CLI)
 tests/test_guard.py            regression suite for the guard hook (pytest)

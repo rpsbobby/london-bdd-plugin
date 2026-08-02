@@ -77,6 +77,13 @@ whether run manually or via `/commit-merge --auto`'s own fresh
 per-invocation authorization. See `references/session-schema.md` for the
 field and its escalation triggers.
 
+The unattended drive runs inside a dedicated `london-bdd:runner` subagent,
+dispatched once by `/inner` — not inline in the main session's own turn.
+Same behaviour, same escalation triggers; the mechanism changed so the main
+session's context never accumulates every cycle's diff and reviewer
+critique across a whole collaborator queue. See
+`references/autonomous-runner.md`.
+
 ## Core principles (Freeman & Pryce)
 
 - Design emerges **outside-in** — start with behaviour, not data.
@@ -151,6 +158,9 @@ Minimum implementation                          →  implementer backend:
                                                      agent (default, Haiku) |
                                                      codex (OpenAI Codex CLI)
 Design critique                                 →  reviewer agent (Sonnet, read-only)
+Unattended queue drain (autonomy: autonomous
+  only, /inner dispatches once)                 →  runner agent (Sonnet, nest-dispatches
+                                                     implementer + reviewer each cycle)
 ```
 
 The human writes/approves every test name and role name — unless
@@ -240,6 +250,9 @@ commands check first anyway — commands are polite, hooks are absolute.
 - `references/collaborator-discovery.md` — role heuristics and naming
 - `references/implementer-backends.md` — the GREEN-step executor
   contract shared by the `agent` and `codex` backends
+- `references/autonomous-runner.md` — the `runner` agent's contract:
+  how `/inner` delegates a whole `autonomy: autonomous` queue drain to a
+  subagent, and its completed/escalated report shape
 - `references/language-notes.md` — general per-language tooling
 - `references/qt-cpp-notes.md` — Qt/C++ specifics (stub, distil from use)
 - `references/python-notes.md` — Python specifics (stub, distil from use)
