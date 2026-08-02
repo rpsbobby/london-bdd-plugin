@@ -116,7 +116,7 @@ def parse_session(path):
     m = re.search(r"^collaborators:\s*\n((?:[ \t]+.*\n?)*)", text, re.M)
     if m:
         for role_m in re.finditer(
-                r"-\s*role:\s*(\S+)\s*\n\s*status:\s*(\S+)", m.group(1)):
+                r"-\s*role:\s*(.+?)\s*\n\s*status:\s*(\S+)", m.group(1)):
             s["collaborators"].append(
                 {"role": role_m.group(1), "status": role_m.group(2)})
     block = re.search(r"^scope:\s*\n((?:[ \t]+.*\n?)*)", text, re.M)

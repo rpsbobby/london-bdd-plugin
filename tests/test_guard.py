@@ -308,6 +308,14 @@ def test_allows_close_when_all_collaborators_done(repo):
     assert code == 0
 
 
+def test_allows_close_when_multiword_role_names_are_all_done(repo):
+    open_slice(repo, "x", phase="inner",
+               **{"collaborators": "\n  - role: Camera factory\n    status: done"
+                                    "\n  - role: TimerTrigger factory\n    status: done"})
+    code, _ = edit_session(repo, "close")
+    assert code == 0
+
+
 def test_blocks_inner_greenfield_with_empty_queue(repo):
     open_slice(repo, "x", phase="decompose", mode="GREENFIELD")
     code, err = edit_session(repo, "inner")
