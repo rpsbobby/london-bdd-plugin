@@ -1,6 +1,6 @@
 ---
 name: inner
-description: Run one full inner-loop cycle for the next collaborator — failing unit test, minimum implementation (implementer agent, Haiku), review and refactor (reviewer agent, Sonnet), one commit on feature/<slice>-tmp. Repeat until the collaborator queue is empty. Paced by session.yml's autonomy field — assisted (default) pauses at each step with the user; autonomous drives the whole queue unattended except for its escalation triggers.
+description: Run one full inner-loop cycle for the next collaborator — failing unit test, minimum implementation (implementer backend — Haiku agent by default, or an external model via implementer.backend), review and refactor (reviewer agent, Sonnet), one commit on feature/<slice>-tmp. Repeat until the collaborator queue is empty. Paced by session.yml's autonomy field — assisted (default) pauses at each step with the user; autonomous drives the whole queue unattended except for its escalation triggers.
 ---
 
 # /inner — One Cycle: Red → Green → Refactor → Commit
@@ -30,16 +30,36 @@ user, as `/unit` describes. `autonomous`: unattended, per `/unit`'s
 autonomous branch. Either way it ends with `current_failing_test` set
 and `🔴 UT` announced.
 
-### 2 — GREEN (implementer agent — Haiku)
-Dispatch the `london-bdd:implementer` agent. Context to pass — nothing
-more:
+### 2 — GREEN (implementer backend)
+Read `implementer.backend` from session.yml (absent = `agent`). Both
+backends satisfy the same contract — see
+`skills/london-bdd/references/implementer-backends.md`. Context to pass
+— nothing more, regardless of backend:
 - The failing test file content
 - The interface/port definitions it references
 - The language notes reference relevant to the stack
-The agent writes the minimum production code, runs the tests, reports.
+
+**`backend: agent` (default) — Haiku subagent.** Dispatch the
+`london-bdd:implementer` agent with the context above. It writes the
+minimum production code, runs the tests, reports.
+
+**`backend: codex` — OpenAI Codex CLI.** Confirm `codex` is on `PATH`
+first — if it's not, stop and tell the user rather than silently falling
+back to `agent`. Run `scripts/codex_implementer.py` via Bash, piping the
+context as JSON on stdin (test file + name, interface file paths,
+language notes, a `test_command` that runs just this test,
+`implementer.model` from session.yml if set, `cwd`). Read its JSON report
+from stdout the same way as the agent's final message. If the report's
+`violation` field is non-null (Codex touched a test file or `.bdd/`),
+treat that as a `block`-severity escalation, not a normal red — stop and
+show the user exactly what was touched, do not retry.
+
+Either way:
 - Tests green → announce `🟢 UT: <class> — <behaviour>`.
-- Still red after the agent's turns → bring the failure back to the main
-  session; you and the user diagnose. Do not loop the agent blindly.
+- Still red after the backend's honest attempts (or the script exits 1 —
+  a config/protocol error, not a red test) → bring the failure back to
+  the main session; you and the user diagnose. Do not loop the backend
+  blindly.
 
 ### 3 — REVIEW + REFACTOR (reviewer agent — Sonnet)
 Dispatch `london-bdd:reviewer` with the diff of this cycle. It critiques
@@ -77,8 +97,10 @@ Announce `🔵 Refactor`.
 Any of these stop an `autonomous` run immediately and hand back to the
 human, exactly as they would interrupt an `assisted` one:
 
-- The implementer stays red after honest attempts within its turns
-  (never loop it blindly, never widen its context to "help" it pass).
+- The GREEN-step backend stays red after honest attempts within its turns
+  (never loop it blindly, never widen its context to "help" it pass), an
+  external backend exits with a protocol error (e.g. `codex` missing from
+  `PATH`), or (codex backend) the report's `violation` field is non-null.
 - The reviewer emits a `block`-severity finding.
 - A hook rejects an action (Rules A–D) — this means the loop's own model
   of state has drifted from the guard's; don't retry blindly.
@@ -87,7 +109,11 @@ human, exactly as they would interrupt an `assisted` one:
 ## Hard rules
 
 - One failing test at a time. Never start a new red with one open.
-- The implementer agent NEVER edits test files or session.yml.
+- The GREEN-step backend NEVER edits test files or session.yml — the
+  `agent` backend by instruction (`agents/implementer.md`), the `codex`
+  backend by its own before/after violation check
+  (`scripts/codex_implementer.py`) since Codex, unlike the agent, isn't
+  mediated file-write-by-file-write.
 - Squash-merging onto feature/<slice>-main happens via `/commit-merge`,
   after `/review` sets `phase: done` — manual by default, or agent-run in
   `--auto` mode with fresh per-invocation authorization. Never merge

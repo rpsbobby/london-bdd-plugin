@@ -17,6 +17,12 @@ mode: GREENFIELD                    # GREENFIELD | SAFE | FULL_REFACTOR
 phase: inner                        # scope | characterise | scenario |
                                     # decompose | inner | close | done
 autonomy: assisted                  # assisted (default) | autonomous
+implementer:                        # GREEN-step executor (optional block;
+  backend: agent                    #   absent = agent, same as today)
+  model: null                        # backend: agent (default) | codex —
+                                    # model: optional --model passthrough,
+                                    # only used when backend: codex
+                                    # (see references/implementer-backends.md)
 branch: feature/place-order-tmp     # expected working branch
 base_branch: feature/place-order-main
 
@@ -88,6 +94,22 @@ session.yml can carry state across that checkout. See `/commit-merge` and
   human even in `autonomous` mode: a `reviewer` finding of severity
   `block`, an implementer that doesn't reach green within its turns, and
   any hook rejection (Rules A–D) — see `commands/inner.md`.
+- `implementer.backend` selects the GREEN-step executor `/inner` dispatches:
+  `agent` (the default — absent behaves exactly as before this field
+  existed) runs the `london-bdd:implementer` Haiku subagent; `codex` shells
+  out to `scripts/codex_implementer.py`, which runs `codex exec` (OpenAI's
+  Codex CLI) non-interactively and verifies the result itself — see
+  `references/implementer-backends.md` for exactly how it checks Codex
+  didn't touch tests or `.bdd/`, and re-runs the test command rather than
+  trusting Codex's own claim. `implementer.model` is passed straight
+  through as `codex exec --model <value>` when set (only read when
+  `backend: codex`); leave it unset to use Codex's own configured
+  default. `backend` itself follows the same discipline as `autonomy`:
+  set once at slice start (`/scenario` or `/refactor-scope`), never
+  silently upgraded — switching backends mid-slice is an explicit
+  checkpoint with the user. The `codex` backend requires the `codex` CLI
+  on `PATH` and already authenticated; `/inner` stops and asks rather than
+  silently falling back to `agent` if it's missing.
 - `current_failing_test` is set by `/unit` (or `/acceptance` for the outer
   red) and cleared by the commit step at the end of the cycle. The
   production-edit hook keys off this field.
