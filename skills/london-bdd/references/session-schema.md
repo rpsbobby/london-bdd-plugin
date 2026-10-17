@@ -17,6 +17,8 @@ mode: GREENFIELD                    # GREENFIELD | SAFE | FULL_REFACTOR
 phase: inner                        # scope | characterise | scenario |
                                     # decompose | inner | close | done
 inner: batch                        # batch (default) | granular
+checks:                             # run by the guard on every slice commit
+  tests: uv run pytest {files}      # {files} = the tests in scope (Rule E)
 branch: feature/place-order-tmp     # expected working branch
 base_branch: feature/place-order-main
 
@@ -59,7 +61,7 @@ tests:                              # the build list, in order — written by
   - name: should_place_order_and_return_id   # /decompose, extended by
     collaborator: OrderService      #   approved discovery proposals
     origin: planned                 # planned | discovered
-    status: done                    # pending | red | done
+    status: done                    # pending | red | green | done
   - name: should_save_order_and_return_id
     collaborator: OrderRepository
     origin: planned
@@ -109,6 +111,17 @@ session.yml can carry state across that checkout. See `/commit-merge` and
   builder isn't stopped for a click on every change. Rules A–E are never
   relaxed by this. It only removes the prompt for what they already
   license.
+- `checks.tests` is the command template the guard runs on every agent
+  commit in the slice (Rule E). `{files}` is replaced with the tests in
+  scope, or they're appended when the placeholder is missing. In scope:
+  test files (by name: `test_*`, `*_test.*`, `*.test.*`, `*.spec.*`,
+  `*Test.*`) changed since `base_branch`, untracked ones included; the
+  acceptance test only from phase `close` on, since it's red on purpose
+  before that; and in SAFE/FULL_REFACTOR, every path in `net.suites`. A
+  failure blocks the commit with the output. Absent = no test run, but
+  the repo's git hooks are still protected from being skipped. Set at
+  slice start (`/scenario`, `/refactor-scope`). The red step never
+  commits, because its new test would fail the checks.
 - `tests` is the build list. `/decompose` writes it (`origin: planned`)
   after the human approves the whole map. Approved discovery proposals
   are appended (`origin: discovered`). Nothing else adds to it: discovery

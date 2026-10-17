@@ -73,6 +73,12 @@ All commands live under the `/london-bdd:` prefix.
   preconditions (outer net exists, test list recorded, every test done,
   etc.) —
   a step can't be skipped just by writing the field.
+- **E.** Every agent commit in a slice runs the checks: your repo's git
+  hooks can't be skipped (`--no-verify`, `SKIP=`, …), an uninstalled
+  pre-commit hook blocks the commit, and the tests in the slice's scope
+  must pass (`checks.tests` in session.yml: the test files the slice
+  touched, plus the acceptance test from `close` on and a SAFE net's
+  suites).
 
 The guard is silent when no `.bdd/session.yml` slice is active.
 
@@ -103,7 +109,8 @@ rejection. See `adr/ADR-001-batch-inner-loop.md` and
 
 ## Branching
 
-`feature/<slice>-tmp`: one agent commit per cycle (test+impl+refactor),
+`feature/<slice>-tmp`: two agent commits per test (at green, after refactor),
+each running your git hooks and the tests in scope,
 disposable. `feature/<slice>-main`: landed via `/commit-merge` when the
 slice is meaningfully complete — manual by default (you run the squash
 yourself), or `--auto` to let the agent run it, confirmed fresh every

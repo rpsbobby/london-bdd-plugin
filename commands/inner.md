@@ -81,7 +81,10 @@ Follow `/unit` for the head open test in `tests:`. It ends with
 ### 2 — GREEN (implementer agent, Haiku)
 Dispatch `london-bdd:implementer` with only: the failing test file, the
 interface/port definitions it references, and the relevant language notes.
-- Green → announce `🟢 UT: <class> — <behaviour>`.
+- Green → set the test's `status: green` (keep `current_failing_test`:
+  it licenses the refactor), commit test + impl + session.yml as
+  `cycle <n>: <collaborator> — <behaviour> (green)`, and announce
+  `🟢 UT: <class> — <behaviour>`.
 - Still red after its honest attempts → bring the failure back; you and
   the user diagnose. Don't loop it blindly.
 
@@ -95,8 +98,14 @@ green. Announce `🔵 Refactor`.
 - Clear `current_failing_test`, set the test `status: done`, set the
   collaborator `status: done` if all its tests are done, increment
   `cycle`, update `last_commit`.
-- Commit test + impl + refactor + session.yml together:
-  `cycle <n>: <collaborator> — <behaviour>`
+- Commit the refactor + session.yml:
+  `cycle <n>: <collaborator> — <behaviour> (refactor)`. With nothing to
+  refactor, the commit carries just the bookkeeping.
+
+Both commits run the commit checks (guard Rule E): the repo's git hooks
+and the tests in scope. A refused commit is feedback, not an escalation.
+Re-add files a hook rewrote, fix what it reports, and fix production code
+(never tests) when a test in scope fails. Never skip the hooks.
 
 ### 5 — NEXT
 Open tests left → tell the user to run `/inner` again.
@@ -110,8 +119,10 @@ builder. Newly approved tests run through `/inner` cycles.
 - The builder or implementer stays red after honest attempts.
 - The builder reports a `design-question`.
 - A `block`-severity finding.
-- A hook rejects an action (Rules A–E). The loop's model of state has
-  drifted from the guard's, so don't retry blindly.
+- A commit is still refused by its checks after three fixes (the
+  builder reports `checks-failing`).
+- A hook rejects an action (Rules A–E) for any other reason. The loop's
+  model of state has drifted from the guard's, so don't retry blindly.
 - Git state is unexpected (wrong branch, dirty tree, detached HEAD).
 
 ## Hard rules

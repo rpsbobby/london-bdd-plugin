@@ -19,7 +19,8 @@ You cannot invoke slash commands, so the algorithm is stated here in full.
 `commands/unit.md` describes the same test shape for granular mode. Keep
 the two in sync by hand.
 
-Budget: ~10-15 turns per test (RED ~4, GREEN ~3-5, REFACTOR ~2, COMMIT ~2),
+Budget: ~10-15 turns per test (RED ~4, GREEN + commit ~4-6, REFACTOR ~2,
+COMMIT ~2),
 plus ~15 for discovery in round 1.
 
 ## 0 — Resume-safety (first, every dispatch)
@@ -66,10 +67,14 @@ Write the least production code that makes this test pass:
   demand. Hardcoding is fine; the next test forces generalisation.
 - Implement against the agreed interfaces exactly.
 
-Run the full unit suite. Green → announce `🟢 UT: <collaborator> —
-<behaviour>`. Still red after three honest attempts → escalate
-`stayed-red` with the real output. Don't thrash, and don't widen scope to
-help it pass.
+Run the full unit suite. Still red after three honest attempts →
+escalate `stayed-red` with the real output. Don't thrash, and don't widen
+scope to help it pass.
+
+Green → set the test's `status: green` (leave `current_failing_test` set:
+it licenses the refactor) and **commit**: test + impl + session.yml,
+`cycle <n>: <collaborator> — <behaviour> (green)`. Announce `🟢 UT:
+<collaborator> — <behaviour>`. See "Commit checks" below.
 
 ## 3 — REFACTOR
 
@@ -83,9 +88,26 @@ than the behaviour. Keep everything green. No new behaviour. Announce
 
 Verify the branch. In session.yml: clear `current_failing_test`, set the
 test's `status: done`, set the collaborator `status: done` if all its
-tests are now done, increment `cycle`, update `last_commit`. Commit test +
-impl + refactor + session.yml together:
-`cycle <n>: <collaborator> — <behaviour>`.
+tests are now done, increment `cycle`, update `last_commit`. Commit the
+refactor + session.yml: `cycle <n>: <collaborator> — <behaviour>
+(refactor)`. Nothing to refactor still gets this commit; it carries the
+bookkeeping.
+
+### Commit checks
+
+Every commit runs the repo's git hooks and the tests in the slice's
+scope (guard Rule E). Never skip them: no `--no-verify`, `-n`, `SKIP=`,
+or `core.hooksPath`. The guard blocks those anyway. When a commit is
+refused:
+- **A hook rewrote files** (formatter, end-of-file fixer): `git add`
+  them and commit again.
+- **A hook reports a problem** (lint, types): fix it in this test's
+  change and commit again.
+- **A test in scope fails**: you broke behaviour an earlier test pins.
+  Fix the production code, never the test.
+
+Three refused attempts on the same commit → escalate `checks-failing`
+with the verbatim output.
 
 Then loop to **1 — RED** for the next queued test, without waiting. Before
 starting a new test (never mid-test), if fewer than ~20 turns remain, stop
@@ -107,7 +129,9 @@ when the slice moves to `close`.
 - `stayed-red`: no green after three honest attempts.
 - `design-question`: the approved test can't be written against the
   agreed map.
-- `hook-rejection`: the guard blocked an action (Rules A-E). Your model
+- `checks-failing`: a commit is still refused after three fixes.
+- `hook-rejection`: the guard blocked an action (Rules A-E) for a reason
+  other than failing commit checks. Your model
   of state has drifted from the guard's, so don't retry blindly.
 - `git-state-unexpected`: wrong branch, dirty tree, or detached HEAD.
 - `turn-budget`: the budget guard tripped before a new test.

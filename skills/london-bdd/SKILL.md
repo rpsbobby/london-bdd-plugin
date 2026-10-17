@@ -170,8 +170,9 @@ gets one failing test and the interfaces it references, nothing else.
 
 ```
 feature/<slice>-main  human history — landed via /commit-merge
-feature/<slice>-tmp   agent workspace — one commit per completed cycle
-                      (test + impl + refactor together), disposable
+feature/<slice>-tmp   agent workspace — two commits per test: at green
+                      (test + impl) and after refactor; each runs the
+                      repo hooks + tests in scope (Rule E); disposable
 ```
 
 Never commit on feature/<slice>-main. Never auto-stash. Wrong branch = stop
@@ -202,6 +203,13 @@ commands check first anyway — commands are polite, hooks are absolute.
   every collaborator and every test `done`; entering `done` requires coming from `close`. The
   guard hook validates the target phase on every edit to session.yml, so
   a step can't be skipped just by writing the field.
+- **E.** Every agent commit in a slice runs the checks. The repo's own git
+  hooks can't be skipped (`--no-verify`, `-n`, `core.hooksPath`, `SKIP=`),
+  a `.pre-commit-config.yaml` must have its hook installed, and the tests
+  in the slice's scope must pass: test files the slice touched, the
+  acceptance test from `close` on, and a SAFE net's suites, run through
+  session.yml's `checks.tests` command. Commit often, at green and after
+  refactor, so the checks run on small diffs.
 
 ## Operating rules
 

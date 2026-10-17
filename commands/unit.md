@@ -48,5 +48,5 @@ Read the `london-bdd` skill. Language tooling in references.
 In batch mode the `builder` agent applies this same shape itself
 (`agents/builder.md`). Keep the two in sync.
 
-Do NOT commit here — the commit happens once per full cycle
-(test + impl + refactor), handled by /inner.
+Do NOT commit here. A red test would fail the commit checks (Rule E).
+`/inner` commits at green and again after refactor.

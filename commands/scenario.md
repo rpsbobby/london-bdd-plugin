@@ -52,13 +52,21 @@ Work through these WITH the user, one at a time:
    on no answer. Either way you approve the test list at `/decompose`
    first, and this command, `/review`, and `/commit-merge` stay
    human-paced.
-5. Create `.bdd/session.yml`:
-   `mode: GREENFIELD`, `phase: decompose`, `acceptance_test.status: red`,
-   `inner` from step 4, branch fields set, empty collaborator list.
-6. Commit on feature/<slice>-tmp: `test: failing acceptance test — <slice>`
+5. **Ask the checks question:** "Which command runs the tests in scope
+   on every commit? `{files}` becomes the test files this slice touches."
+   Suggest one from the repo's tooling (`uv run pytest {files}`,
+   `npx vitest run {files}`, `go test ./...`). Record it as
+   `checks.tests`. If the repo has a `.pre-commit-config.yaml`, check
+   its hook is installed (`pre-commit install` if not): the guard blocks
+   commits otherwise.
+6. Create `.bdd/session.yml`:
+   `mode: GREENFIELD`, `phase: decompose`, `acceptance_test.status: red`
+   with its `file`, `inner` from step 4, `checks` from step 5, branch
+   fields set, empty collaborator list.
+7. Commit on feature/<slice>-tmp: `test: failing acceptance test — <slice>`
    (if the slice came from `docs/backlog.md`, remove that entry in the
    same commit).
-7. Announce: `🔴 AT: <behaviour>` and tell the user the next command is
+8. Announce: `🔴 AT: <behaviour>` and tell the user the next command is
    `/decompose`.
 
 ## Rules
