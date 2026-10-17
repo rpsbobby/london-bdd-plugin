@@ -59,7 +59,9 @@ Read the `london-bdd` skill. Language tooling:
 7. Announce `🔴 AT: <behaviour>`.
 8. Tell the user the next command: `/decompose` if this introduced
    collaborators not yet in the queue, otherwise `/inner` to keep working
-   the existing queue.
+   the existing queue. When `/inner`'s discovery triage brought you here
+   (an approved `this-slice` AT), go back to it: the UTs this AT needs
+   get approved into `tests:` there.
 
 ## Rules
 

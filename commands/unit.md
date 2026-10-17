@@ -1,6 +1,6 @@
 ---
 name: unit
-description: Write one failing unit test for the current collaborator — behaviour-named, mocked collaborators, narrow scope, max ~10 lines. The inner loop's red. Usually invoked via /inner.
+description: Write one failing unit test — the next open test in session.yml's tests list — behaviour-named, mocked collaborators, narrow scope, max ~10 lines. The inner loop's red in granular mode. Usually invoked via /inner.
 ---
 
 # /unit — The Inner Red
@@ -32,18 +32,21 @@ Read the `london-bdd` skill. Language tooling in references.
 
 ## Procedure
 
-1. Check session.yml: `phase: inner`, a collaborator with
-   `status: pending|red` at the head of the queue, on feature/<slice>-tmp,
+1. Check session.yml: `phase: inner`, on feature/<slice>-tmp,
    `current_failing_test` empty (one red at a time — never two).
-2. `autonomy: assisted` — confirm with the user which behaviour of the
-   collaborator this test drives. `autonomy: autonomous` — pick it
-   yourself, outside-in, smallest behaviour that makes progress on the
-   role's interface.
+2. Take the first `tests:` item that isn't `done`. Its name and
+   collaborator were approved at `/decompose` or in discovery, so write
+   that test. If the user wants a different behaviour, add it to the list
+   with them first. Never write an unlisted test.
 3. Write the test. Run it; verify it fails for the right reason.
 4. Set `current_failing_test` in session.yml (this unlocks production
-   edits for the hook), collaborator `status: red`.
+   edits for the hook), the test's `status: red`, and its collaborator's
+   `status: red`.
 5. Announce `🔴 UT: <class> — <behaviour>`.
-6. Hand back to `/inner` — its GREEN step (implementer agent) is next.
+6. Hand back to `/inner`. Its GREEN step (implementer agent) is next.
 
-Do NOT commit here — the commit happens once per full cycle
-(test + impl + refactor), handled by /inner.
+In batch mode the `builder` agent applies this same shape itself
+(`agents/builder.md`). Keep the two in sync.
+
+Do NOT commit here. A red test would fail the commit checks (Rule E).
+`/inner` commits at green and again after refactor.

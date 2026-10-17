@@ -63,26 +63,34 @@ missing or untrusted, and only over that gap.
 Mode is declared at slice start and recorded in `.bdd/session.yml`.
 Switching modes mid-slice requires an explicit checkpoint with the user.
 
-## Autonomy — opt-in, not default
+## Inner-loop modes — batch by default
 
-`/decompose` and `/inner` normally pause for the user at every role name
-and every cycle. Setting `autonomy: autonomous` in `.bdd/session.yml`
-(offered by `/scenario` and `/refactor-scope`, default `assisted`) lets
-the agent drive the whole collaborator queue unattended: name roles,
-pick each behaviour, run red → green → review → commit, cycle after
-cycle, without ending its turn between them. The outer red
-(`/scenario`/`/acceptance`), `/review`, and `/commit-merge` are **never**
-autonomous — landing the slice always stays a separate, human-paced step,
-whether run manually or via `/commit-merge --auto`'s own fresh
-per-invocation authorization. See `references/session-schema.md` for the
-field and its escalation triggers.
+`/decompose` proposes the collaborators and the unit tests that drive
+them, and the human approves that map once. `/inner` then works the list
+in one of two modes, set as `inner:` in `.bdd/session.yml` at slice start:
+
+- **batch** (default): one Sonnet `builder` subagent builds every test
+  unattended (red → green → refactor → commit per test), then proposes
+  what's still untested: UT corner cases and, when it has the context, AT
+  scenarios. The driver (main session) reviews the diff and the proposals
+  with the human. Approved UTs get exactly one more build round, with no
+  further discovery.
+- **granular**: the human-paced cycle, one test per `/inner` call, with
+  the Haiku `implementer` and the Sonnet `reviewer` each cycle.
+
+Discovery only proposes and the human approves every test that enters
+the list. AT candidates for this slice need approval, and candidates for
+other slices go to `docs/backlog.md`. `/review` runs one more automatic
+AT-discovery pass before the merge, then asks. See
+`references/test-discovery.md`. The outer red, `/review`, and
+`/commit-merge` are human-paced in both modes.
 
 ## Core principles (Freeman & Pryce)
 
 - Design emerges **outside-in** — start with behaviour, not data.
 - Collaborators are **discovered, not invented**. Introduce an interface
   when a class needs a helper; mock it in the unit test.
-- Each inner-loop cycle drives exactly one collaborator into existence.
+- Each inner-loop cycle drives exactly one behaviour of one collaborator.
 
 ## The doubling principle (scale-invariant)
 
@@ -146,27 +154,25 @@ not what should be.
 ## Model routing (enforced by agent definitions)
 
 ```
-Outer loop, decomposition, unit tests, review  →  main session (Sonnet/Opus) + user
-Minimum implementation                          →  implementer backend:
-                                                     agent (default, Haiku) |
-                                                     codex (OpenAI Codex CLI)
-Design critique                                 →  reviewer agent (Sonnet, read-only)
+Outer loop, decomposition, review, discovery triage →  main session (driver) + user
+Build the test list (inner: batch)                  →  builder agent (Sonnet): red, green,
+                                                         refactor, commit per test,
+                                                         then discovery proposals
+Minimum implementation (inner: granular)            →  implementer agent (Haiku)
+Design critique (inner: granular)                   →  reviewer agent (Sonnet, read-only)
 ```
 
-The human writes/approves every test name and role name — unless
-`autonomy: autonomous` is set, in which case the main session may do
-both unattended. The implementer gets one failing test and the
-interfaces it references — nothing else, in either mode, regardless of
-which backend runs it (see `references/implementer-backends.md`).
-`implementer.backend` in session.yml picks the executor — `agent`
-(default) or `codex`, set once at slice start like `autonomy`.
+The human approves every role name and every test that enters the list,
+at `/decompose` and at discovery triage. In granular mode the implementer
+gets one failing test and the interfaces it references, nothing else.
 
 ## Branching discipline
 
 ```
 feature/<slice>-main  human history — landed via /commit-merge
-feature/<slice>-tmp   agent workspace — one commit per completed cycle
-                      (test + impl + refactor together), disposable
+feature/<slice>-tmp   agent workspace — two commits per test: at green
+                      (test + impl) and after refactor; each runs the
+                      repo hooks + tests in scope (Rule E); disposable
 ```
 
 Never commit on feature/<slice>-main. Never auto-stash. Wrong branch = stop
@@ -176,7 +182,7 @@ the agent runs the squash-merge itself, authorized fresh every invocation
 — never a persisted "always auto". The guard hook enforces all of this;
 commands check first anyway — commands are polite, hooks are absolute.
 
-## The four hard rules (hook-enforced)
+## The five hard rules (hook-enforced)
 
 - **A.** A production edit requires a license — any one of: a recorded
   failing test in `.bdd/session.yml` (the normal red); phase `close`
@@ -193,17 +199,25 @@ commands check first anyway — commands are polite, hooks are absolute.
 - **D.** Phase transitions in `.bdd/session.yml` are forward-only and
   earned, not self-reported: entering `inner` requires the outer net to
   exist (AT red / net green) and, for GREENFIELD, a
-  non-empty collaborator queue; entering `close` requires every
-  collaborator `done`; entering `done` requires coming from `close`. The
+  non-empty collaborator queue and test list; entering `close` requires
+  every collaborator and every test `done`; entering `done` requires coming from `close`. The
   guard hook validates the target phase on every edit to session.yml, so
   a step can't be skipped just by writing the field.
+- **E.** Every agent commit in a slice runs the checks. The repo's own git
+  hooks can't be skipped (`--no-verify`, `-n`, `core.hooksPath`, `SKIP=`),
+  a `.pre-commit-config.yaml` must have its hook installed, and the tests
+  in the slice's scope must pass: test files the slice touched, the
+  acceptance test from `close` on, and a SAFE net's suites, run through
+  session.yml's `checks.tests` command. Commit often, at green and after
+  refactor, so the checks run on small diffs.
 
 ## Operating rules
 
 1. Show the traffic light (🔴/🟢/🔵) before each action.
 2. One failing test at a time — never two reds open.
 3. Never mock types you don't own — wrap first.
-4. Confirm role names with the user before introducing an interface.
+4. Role names and the test list are approved by the user at `/decompose`,
+   before any interface is introduced.
 5. Run tests after every change; show real output.
 6. Session state lives in `.bdd/session.yml` (see
    `references/session-schema.md`) — read first, update last, trust it
@@ -212,10 +226,10 @@ commands check first anyway — commands are polite, hooks are absolute.
    the repo.
 7. Deviations requested by the user are honoured but noted, with why the
    step matters.
-8. Autonomy never overrides an escalation trigger: a `block`-severity
-   reviewer finding, an implementer that stays red after honest attempts,
-   or a hook rejection (Rules A–D) all stop the loop and hand back to the
-   human, even in `autonomous` mode.
+8. Batch mode never overrides an escalation trigger: a `block`-severity
+   finding, a test that stays red after honest attempts, a design
+   question the map didn't answer, or a hook rejection (Rules A–E) all
+   stop the loop and hand back to the human.
 
 ## Common failure modes
 
@@ -238,8 +252,8 @@ commands check first anyway — commands are polite, hooks are absolute.
 - `references/approval-testing.md` — golden-master/approval testing and
   which library to reach for per language
 - `references/collaborator-discovery.md` — role heuristics and naming
-- `references/implementer-backends.md` — the GREEN-step executor
-  contract shared by the `agent` and `codex` backends
+- `references/test-discovery.md` — what discovery looks for, UT vs AT
+  sizing, the proposal format, and how approved proposals are recorded
 - `references/language-notes.md` — general per-language tooling
 - `references/qt-cpp-notes.md` — Qt/C++ specifics (stub, distil from use)
 - `references/python-notes.md` — Python specifics (stub, distil from use)

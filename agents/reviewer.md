@@ -1,6 +1,6 @@
 ---
 name: reviewer
-description: Adversarial design review of a cycle or slice diff in the London School BDD loop. Critiques and proposes refactors; never applies changes. Invoked by /inner (cycle) and /review (slice).
+description: Adversarial design review of a cycle or slice diff in the London School BDD loop. Critiques and proposes refactors; never applies changes. Invoked by /inner (granular cycle) and /review (granular slice). In batch mode the driver applies this same checklist itself.
 model: sonnet
 maxTurns: 15
 disallowedTools: Write, Edit, NotebookEdit

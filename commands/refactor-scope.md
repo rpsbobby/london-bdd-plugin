@@ -43,25 +43,22 @@ skill and `references/scope-template.md`.
      be characterised first — `net: {kind: characterisation, status: absent}`.
    Coverage that is implementation-coupled does NOT qualify — a net that
    breaks on refactoring is not a net.
-5. **Ask the autonomy question:** "Run `/decompose` and `/inner` assisted
-   (pause for you at each role and each cycle — default), or autonomous
-   (unattended, stopping only on a blocking review finding, a stalled
-   implementer, or a hook rejection)?" Default to `assisted` on no
-   answer. `/characterise`, `/review`, and `/commit-merge` stay
+5. **Ask the inner-loop question:** "Build the approved test list in
+   `batch` (one builder agent builds it all, then we review the result
+   and its discovery proposals: default), or `granular` (one test per
+   `/inner` call, pausing for you at each step)?" Default to `batch` on
+   no answer. `/characterise`, `/review`, and `/commit-merge` stay
    human-paced either way.
-6. **Ask the implementer backend question:** "Run the GREEN step with the
-   built-in `agent` backend (Haiku subagent — default), or delegate it to
-   the `codex` backend (runs `codex exec`, OpenAI's Codex CLI, non-
-   interactively — needs `codex` on `PATH` and already authenticated)?"
-   Default to `agent` on no answer. If `codex`, ask which model to pass
-   (optional — leave unset to use Codex's own configured default). See
-   `references/implementer-backends.md`.
+6. **Ask the checks question:** "Which command runs the tests in scope
+   on every commit? `{files}` becomes the test files this slice touches,
+   plus the net's suites." Suggest one from the repo's tooling and
+   record it as `checks.tests`. If the repo has a
+   `.pre-commit-config.yaml`, check its hook is installed.
 7. Create branches (`feature/<slice>-main`, `feature/<slice>-tmp`), check
    out feature/<slice>-tmp.
 8. Write `.bdd/session.yml` with `mode`, the scope block, branch fields,
-   the `net:` block, `autonomy` from step 5, `implementer.backend` (and
-   `implementer.model` if `codex`) from step 6, and the phase the net
-   decision earned:
+   the `net:` block, `inner` from step 5, `checks` from step 6, and the
+   phase the net decision earned:
    - net still to build → `phase: characterise`
    - net existing + green → `phase: inner` (SAFE) or `phase: decompose`
      (FULL_REFACTOR)

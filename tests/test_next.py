@@ -78,3 +78,34 @@ def test_phase_done_suggests_commit_merge(tmp_path):
     open_slice(tmp_path, "x", phase="done")
     out = run_next(tmp_path)
     assert out.startswith("next: /commit-merge")
+
+
+def test_phase_inner_names_the_next_pending_test(tmp_path):
+    init_repo(tmp_path)
+    open_slice(
+        tmp_path, "x", phase="inner",
+        **{"collaborators": "\n  - role: OrderRepository\n    status: red",
+           "tests": "\n  - name: should_save_order\n    collaborator: OrderRepository"
+                    "\n    origin: planned\n    status: done"
+                    "\n  - name: should_reject_duplicate\n    collaborator: OrderRepository"
+                    "\n    origin: discovered\n    status: pending"})
+    out = run_next(tmp_path)
+    assert out.startswith("next: /inner")
+    assert "should_reject_duplicate" in out
+    assert "1 test(s) left" in out
+
+
+def test_phase_inner_reports_batch_mode_by_default(tmp_path):
+    init_repo(tmp_path)
+    open_slice(tmp_path, "x", phase="inner",
+               **{"collaborators": "\n  - role: A\n    status: pending"})
+    out = run_next(tmp_path)
+    assert "batch" in out
+
+
+def test_phase_inner_reports_granular_mode_when_declared(tmp_path):
+    init_repo(tmp_path)
+    open_slice(tmp_path, "x", phase="inner", inner="granular",
+               **{"collaborators": "\n  - role: A\n    status: pending"})
+    out = run_next(tmp_path)
+    assert "granular" in out

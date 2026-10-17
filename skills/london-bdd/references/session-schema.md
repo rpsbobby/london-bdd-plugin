@@ -16,13 +16,9 @@ slice: place-order                  # kebab-case slice name
 mode: GREENFIELD                    # GREENFIELD | SAFE | FULL_REFACTOR
 phase: inner                        # scope | characterise | scenario |
                                     # decompose | inner | close | done
-autonomy: assisted                  # assisted (default) | autonomous
-implementer:                        # GREEN-step executor (optional block;
-  backend: agent                    #   absent = agent, same as today)
-  model: null                        # backend: agent (default) | codex —
-                                    # model: optional --model passthrough,
-                                    # only used when backend: codex
-                                    # (see references/implementer-backends.md)
+inner: batch                        # batch (default) | granular
+checks:                             # run by the guard on every slice commit
+  tests: uv run pytest {files}      # {files} = the tests in scope (Rule E)
 branch: feature/place-order-tmp     # expected working branch
 base_branch: feature/place-order-main
 
@@ -58,9 +54,23 @@ scope:
 # Inner loop bookkeeping
 collaborators:
   - role: OrderService
-    status: done                    # pending | red | green | done
+    status: done                    # pending | red | done
   - role: OrderRepository
     status: red
+tests:                              # the build list, in order — written by
+  - name: should_place_order_and_return_id   # /decompose, extended by
+    collaborator: OrderService      #   approved discovery proposals
+    origin: planned                 # planned | discovered
+    status: done                    # pending | red | green | done
+  - name: should_save_order_and_return_id
+    collaborator: OrderRepository
+    origin: planned
+    status: red
+  - name: should_reject_duplicate_order_id
+    collaborator: OrderRepository
+    origin: discovered
+    status: pending
+discovery_rounds: 1                 # inner-loop discovery rounds run (0|1)
 current_failing_test:
   file: tests/unit/OrderRepository_test.cpp
   name: OrderRepository.SavesAndReturnsId
@@ -79,37 +89,51 @@ session.yml can carry state across that checkout. See `/commit-merge` and
 
 ## Field rules
 
-- `autonomy` gates whether `/decompose` and `/inner` pause for the user at
-  each step. `assisted` (the default — assumed when the field is absent,
-  so existing session files behave exactly as before) keeps every
-  checkpoint described in those commands. `autonomous` lets the agent
-  drive role naming and cycle selection unattended. It is set once, at
-  slice start (`/scenario` or `/refactor-scope`), never defaulted to, and
-  never silently upgraded mid-slice — switching requires the same explicit
-  checkpoint as a mode switch. It governs `/decompose` and `/inner` only:
-  `/scenario`, `/acceptance`, `/refactor-scope`, `/review`, and
-  `/commit-merge` are always human-paced regardless of this field (note
-  `/commit-merge --auto` is a separate, per-invocation authorization —
-  `autonomy: autonomous` does not imply it). Three things escalate to the
-  human even in `autonomous` mode: a `reviewer` finding of severity
-  `block`, an implementer that doesn't reach green within its turns, and
-  any hook rejection (Rules A–D) — see `commands/inner.md`.
-- `implementer.backend` selects the GREEN-step executor `/inner` dispatches:
-  `agent` (the default — absent behaves exactly as before this field
-  existed) runs the `london-bdd:implementer` Haiku subagent; `codex` shells
-  out to `scripts/codex_implementer.py`, which runs `codex exec` (OpenAI's
-  Codex CLI) non-interactively and verifies the result itself — see
-  `references/implementer-backends.md` for exactly how it checks Codex
-  didn't touch tests or `.bdd/`, and re-runs the test command rather than
-  trusting Codex's own claim. `implementer.model` is passed straight
-  through as `codex exec --model <value>` when set (only read when
-  `backend: codex`); leave it unset to use Codex's own configured
-  default. `backend` itself follows the same discipline as `autonomy`:
-  set once at slice start (`/scenario` or `/refactor-scope`), never
-  silently upgraded — switching backends mid-slice is an explicit
-  checkpoint with the user. The `codex` backend requires the `codex` CLI
-  on `PATH` and already authenticated; `/inner` stops and asks rather than
-  silently falling back to `agent` if it's missing.
+- `inner` picks how `/inner` works the test list. `batch` (the default,
+  assumed when the field is absent) dispatches the `london-bdd:builder`
+  Sonnet subagent to build every open test unattended (red, green,
+  refactor, commit per test), then the driver (main session) reviews the
+  result and the builder's discovery proposals with the human.
+  `granular` is the human-paced cycle: one test per `/inner` call, the
+  Haiku `implementer` for GREEN and the Sonnet `reviewer` per cycle. Both
+  modes share `/decompose`'s single approval of the test list, and both
+  stop for the human on a `block` finding, a test that stays red, or a
+  hook rejection. `inner` is set once at slice start (`/scenario` or
+  `/refactor-scope`) and switching mid-slice is an explicit checkpoint
+  with the user. It governs `/inner` only: `/scenario`, `/acceptance`,
+  `/decompose`, `/review`, and `/commit-merge` are human-paced in both
+  modes (`/commit-merge --auto` is a separate, per-invocation
+  authorization). It also changes what `scripts/guard.py` does when it
+  would otherwise stay silent. `granular` sessions fall through to
+  Claude Code's normal interactive approval prompt on every
+  Edit/Write/Bash call. `batch` sessions get an explicit PreToolUse
+  `allow` once an action has survived Rules A–E, so the unattended
+  builder isn't stopped for a click on every change. Rules A–E are never
+  relaxed by this. It only removes the prompt for what they already
+  license.
+- `checks.tests` is the command template the guard runs on every agent
+  commit in the slice (Rule E). `{files}` is replaced with the tests in
+  scope, or they're appended when the placeholder is missing. In scope:
+  test files (by name: `test_*`, `*_test.*`, `*.test.*`, `*.spec.*`,
+  `*Test.*`) changed since `base_branch`, untracked ones included; the
+  acceptance test only from phase `close` on, since it's red on purpose
+  before that; and in SAFE/FULL_REFACTOR, every path in `net.suites`. A
+  failure blocks the commit with the output. Absent = no test run, but
+  the repo's git hooks are still protected from being skipped. Set at
+  slice start (`/scenario`, `/refactor-scope`). The red step never
+  commits, because its new test would fail the checks.
+- `tests` is the build list. `/decompose` writes it (`origin: planned`)
+  after the human approves the whole map. Approved discovery proposals
+  are appended (`origin: discovered`). Nothing else adds to it: discovery
+  only proposes. The head non-`done` item is the next test, in both modes.
+  A collaborator is `done` when all its tests are.
+- `discovery_rounds` counts inner-loop discovery rounds. The builder (or,
+  in granular mode, the driver) runs discovery only while it is 0, then
+  sets it to 1. A second round happens only when the human asks. See
+  `references/test-discovery.md`.
+- AT candidates for other slices go to `docs/backlog.md`, never to
+  session.yml. That file is excluded from the squash and archived per
+  slice, while the backlog has to outlive both.
 - `current_failing_test` is set by `/unit` (or `/acceptance` for the outer
   red) and cleared by the commit step at the end of the cycle. The
   production-edit hook keys off this field.
@@ -132,7 +156,7 @@ session.yml can carry state across that checkout. See `/commit-merge` and
   This is hook-enforced, not just documented: `scripts/guard.py`'s Rule D
   validates the target phase on every edit to session.yml — it blocks
   backward moves and moves into a phase whose precondition isn't actually
-  met yet (e.g. `close` requires every collaborator `done`), so a step
+  met yet (e.g. `close` requires every collaborator and every test `done`; GREENFIELD `inner` requires a non-empty `tests:` list), so a step
   can't be skipped by writing the field directly.
 - Don't re-derive "what's next" by exploring the repo — it's a lookup,
   not a judgment call. Run `/status` (`scripts/next.py`), which parses
