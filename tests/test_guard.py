@@ -334,6 +334,8 @@ def test_blocks_inner_greenfield_without_red_acceptance_test(repo):
 def test_allows_inner_greenfield_with_queue_and_red_at(repo):
     open_slice(repo, "x", phase="decompose", mode="GREENFIELD",
                **{"collaborators": "\n  - role: A\n    status: pending",
+                  "tests": "\n  - name: should_a\n    collaborator: A"
+                           "\n    origin: planned\n    status: pending",
                   "acceptance_test": "\n  status: red"})
     code, _ = edit_session(repo, "inner")
     assert code == 0
@@ -428,25 +430,26 @@ def test_silent_bash_write_to_session_yml_when_no_active_slice(repo):
     assert code == 0
 
 
-# ---- autonomy: autonomous — explicit allow, not just silence ----------
+# ---- inner: batch — explicit allow, not just silence -------------------
 #
-# `assisted` sessions rely on Claude Code's normal permission prompt for
-# every Edit/Write/Bash call — the guard only ever blocks or stays silent.
-# `autonomy: autonomous` means nobody is there to answer that prompt mid
-# -run, so once an action survives Rules A-D the guard must say so
-# explicitly (a PreToolUse `allow` decision on stdout), not just decline to
-# object.
+# `inner: granular` sessions are human-paced and rely on Claude Code's
+# normal permission prompt for every Edit/Write/Bash call — the guard only
+# ever blocks or stays silent. `inner: batch` (the default when the field
+# is absent) hands the test list to an unattended builder subagent, so
+# once an action survives Rules A-D the guard must say so explicitly (a
+# PreToolUse `allow` decision on stdout), not just decline to object.
 
-def test_licensed_edit_stays_silent_when_assisted(repo):
-    open_slice(repo, "x", current_failing_test="\n  file: t.py\n  name: t")
+def test_licensed_edit_stays_silent_when_granular(repo):
+    open_slice(repo, "x", inner="granular",
+               current_failing_test="\n  file: t.py\n  name: t")
     code, _err, out = guard_full(repo, "edit",
                                   file_path=str(repo / "src" / "order.py"))
     assert code == 0
     assert out == ""
 
 
-def test_licensed_edit_explicitly_allowed_when_autonomous(repo):
-    open_slice(repo, "x", autonomy="autonomous",
+def test_licensed_edit_explicitly_allowed_when_batch(repo):
+    open_slice(repo, "x", inner="batch",
                current_failing_test="\n  file: t.py\n  name: t")
     code, _err, out = guard_full(repo, "edit",
                                   file_path=str(repo / "src" / "order.py"))
@@ -455,8 +458,17 @@ def test_licensed_edit_explicitly_allowed_when_autonomous(repo):
     assert decision["hookSpecificOutput"]["permissionDecision"] == "allow"
 
 
-def test_always_allowed_path_explicitly_allowed_when_autonomous(repo):
-    open_slice(repo, "x", autonomy="autonomous")
+def test_absent_inner_field_defaults_to_batch(repo):
+    open_slice(repo, "x", current_failing_test="\n  file: t.py\n  name: t")
+    code, _err, out = guard_full(repo, "edit",
+                                  file_path=str(repo / "src" / "order.py"))
+    assert code == 0
+    decision = json.loads(out)
+    assert decision["hookSpecificOutput"]["permissionDecision"] == "allow"
+
+
+def test_always_allowed_path_explicitly_allowed_when_batch(repo):
+    open_slice(repo, "x", inner="batch")
     code, _err, out = guard_full(
         repo, "edit", file_path=str(repo / "tests" / "unit" / "x_test.py"))
     assert code == 0
@@ -464,27 +476,27 @@ def test_always_allowed_path_explicitly_allowed_when_autonomous(repo):
     assert decision["hookSpecificOutput"]["permissionDecision"] == "allow"
 
 
-def test_unlicensed_edit_still_blocked_when_autonomous(repo):
-    """autonomy: autonomous licenses nothing by itself — Rule A still
-    gates production edits on a recorded failing test."""
-    open_slice(repo, "x", autonomy="autonomous")
+def test_unlicensed_edit_still_blocked_when_batch(repo):
+    """inner: batch licenses nothing by itself — Rule A still gates
+    production edits on a recorded failing test."""
+    open_slice(repo, "x", inner="batch")
     code, err = guard(repo, "edit", file_path=str(repo / "src" / "order.py"))
     assert code == 2
     assert "Rule A" in err
 
 
-def test_bash_explicitly_allowed_when_autonomous(repo):
-    open_slice(repo, "x", autonomy="autonomous")
+def test_bash_explicitly_allowed_when_batch(repo):
+    open_slice(repo, "x", inner="batch")
     code, _err, out = guard_full(repo, "bash", command="git commit -m cycle")
     assert code == 0
     decision = json.loads(out)
     assert decision["hookSpecificOutput"]["permissionDecision"] == "allow"
 
 
-def test_rebase_still_blocked_when_autonomous(repo):
-    """Rules A-D are never relaxed by autonomy — it only removes the
+def test_rebase_still_blocked_when_batch(repo):
+    """Rules A-D are never relaxed by batch mode — it only removes the
     prompt for what the rules already license."""
-    main_br, tmp_br = open_slice(repo, "x", phase="done", autonomy="autonomous")
+    main_br, tmp_br = open_slice(repo, "x", phase="done", inner="batch")
     write_marker(repo, tmp_br, main_br)
     run_git(repo, "checkout", "-q", main_br)
     code, err = guard(repo, "bash", command="git rebase feature/x-tmp")
@@ -492,11 +504,68 @@ def test_rebase_still_blocked_when_autonomous(repo):
     assert "rebase" in err.lower()
 
 
-def test_no_active_slice_stays_silent_even_if_command_mentions_autonomous(repo):
-    """Autonomy is a session.yml field — with no session at all there is
-    nothing to declare it, so behaviour is unchanged (silent, not allow)."""
+def test_no_active_slice_stays_silent(repo):
+    """The batch default is a session.yml property — with no session at
+    all there is nothing to declare it, so behaviour is unchanged
+    (silent, not allow)."""
     (repo / "src").mkdir()
     code, _err, out = guard_full(repo, "edit",
                                   file_path=str(repo / "src" / "order.py"))
     assert code == 0
     assert out == ""
+
+
+# ---- Rule D: the planned/discovered test list -------------------------
+#
+# /decompose records a `tests:` list next to the collaborators; batch and
+# granular mode both work it. Close is earned by draining that list, not
+# just by marking collaborators done.
+
+def test_list(*items):
+    """items: (name, collaborator, origin, status) tuples."""
+    return "".join(
+        f"\n  - name: {n}\n    collaborator: {c}\n    origin: {o}"
+        f"\n    status: {s}" for n, c, o, s in items)
+
+
+def test_blocks_close_with_an_unfinished_planned_test(repo):
+    open_slice(repo, "x", phase="inner",
+               **{"collaborators": "\n  - role: A\n    status: done",
+                  "tests": test_list(
+                      ("should_save", "A", "planned", "done"),
+                      ("should_reject_empty", "A", "planned", "pending"))})
+    code, err = edit_session(repo, "close")
+    assert code == 2
+    assert "Rule D" in err
+    assert "should_reject_empty" in err
+
+
+def test_blocks_close_with_an_unfinished_discovered_test(repo):
+    open_slice(repo, "x", phase="inner",
+               **{"collaborators": "\n  - role: A\n    status: done",
+                  "tests": test_list(
+                      ("should_save", "A", "planned", "done"),
+                      ("should_handle_duplicate", "A", "discovered", "red"))})
+    code, err = edit_session(repo, "close")
+    assert code == 2
+    assert "should_handle_duplicate" in err
+
+
+def test_allows_close_when_every_test_is_done(repo):
+    open_slice(repo, "x", phase="inner",
+               **{"collaborators": "\n  - role: A\n    status: done",
+                  "tests": test_list(
+                      ("should_save", "A", "planned", "done"),
+                      ("should_handle_duplicate", "A", "discovered", "done"))})
+    code, _ = edit_session(repo, "close")
+    assert code == 0
+
+
+def test_blocks_inner_greenfield_without_a_planned_test_list(repo):
+    open_slice(repo, "x", phase="decompose", mode="GREENFIELD",
+               **{"collaborators": "\n  - role: A\n    status: pending",
+                  "acceptance_test": "\n  status: red"})
+    code, err = edit_session(repo, "inner")
+    assert code == 2
+    assert "Rule D" in err
+    assert "test" in err.lower()

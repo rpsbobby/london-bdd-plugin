@@ -76,8 +76,8 @@ def parse_session(path):
     s = {"slice": None, "mode": None, "branch": None, "base_branch": None,
          "current_failing_test": None, "scope_in": [], "scope_out": [],
          "phase": None, "char_status": None, "net_status": None,
-         "net_kind": None, "acceptance_status": None, "autonomy": None,
-         "collaborators": [], "cycle": 0}
+         "net_kind": None, "acceptance_status": None, "inner": "batch",
+         "collaborators": [], "tests": [], "cycle": 0}
     try:
         text = open(path, encoding="utf-8").read()
     except OSError:
@@ -86,8 +86,8 @@ def parse_session(path):
     if m: s["slice"] = m.group(1)
     m = re.search(r"^mode:\s*(\S+)", text, re.M)
     if m: s["mode"] = m.group(1)
-    m = re.search(r"^autonomy:\s*(\S+)", text, re.M)
-    if m: s["autonomy"] = m.group(1)
+    m = re.search(r"^inner:\s*(\S+)", text, re.M)
+    if m: s["inner"] = m.group(1)
     m = re.search(r"^phase:\s*(\S+)", text, re.M)
     if m: s["phase"] = m.group(1)
     m = re.search(r"^branch:\s*(\S+)", text, re.M)
@@ -119,6 +119,16 @@ def parse_session(path):
                 r"-\s*role:\s*(.+?)\s*\n\s*status:\s*(\S+)", m.group(1)):
             s["collaborators"].append(
                 {"role": role_m.group(1), "status": role_m.group(2)})
+    m = re.search(r"^tests:\s*\n((?:[ \t]+.*\n?)*)", text, re.M)
+    if m:
+        for item in re.split(r"^[ \t]*-[ \t]*", m.group(1), flags=re.M)[1:]:
+            fields = dict(re.findall(r"^[ \t]*(\w+):[ \t]*(.*?)[ \t]*$",
+                                     item, re.M))
+            if "name" in fields:
+                s["tests"].append({"name": fields["name"],
+                                   "collaborator": fields.get("collaborator"),
+                                   "origin": fields.get("origin"),
+                                   "status": fields.get("status")})
     block = re.search(r"^scope:\s*\n((?:[ \t]+.*\n?)*)", text, re.M)
     if block:
         cur = None
@@ -192,6 +202,10 @@ def validate_phase_transition(s, new_phase):
             if not s["collaborators"]:
                 return ("Rule D: cannot enter phase 'inner' with an empty "
                         "collaborator queue — run /decompose first.")
+            if not s["tests"]:
+                return ("Rule D: cannot enter phase 'inner' without a "
+                        "planned test list — /decompose records the tests "
+                        "to build alongside the collaborators.")
             if s["acceptance_status"] != "red":
                 return ("Rule D: cannot enter phase 'inner' — the "
                         "acceptance test must be recorded red first "
@@ -212,6 +226,11 @@ def validate_phase_transition(s, new_phase):
             return ("Rule D: cannot enter phase 'close' — collaborator(s) "
                      f"still open: {', '.join(unfinished)}. Finish the "
                      "queue with /inner.")
+        open_tests = [t["name"] for t in s["tests"] if t["status"] != "done"]
+        if open_tests:
+            return ("Rule D: cannot enter phase 'close' — test(s) still "
+                    f"open: {', '.join(open_tests)}. Finish the test list "
+                    "with /inner.")
 
     if new_phase == "done" and old_phase != "close":
         return ("Rule D: cannot enter phase 'done' except from 'close' — "
@@ -303,24 +322,24 @@ def block(msg):
 def allow_silently():
     """The guard has nothing to say: no active slice, or the action falls
     outside what this guard governs. Falls through to Claude Code's normal
-    permission flow — unchanged behaviour for a human-paced (`assisted`)
+    permission flow — unchanged behaviour for a human-paced (`inner: granular`)
     session."""
     sys.exit(0)
 
 
 def allow_explicitly():
     """The guard actively licenses this action under session.yml's
-    `autonomy: autonomous` — emit an explicit PreToolUse `allow` decision so
-    the interactive approval prompt is skipped. Every rule above (A-D) still
-    ran first; this only fires once an action has already survived them, so
-    an autonomous run is unattended for licensed work while still stopping
-    dead on anything Rules A-D reject."""
+    `inner: batch` (the default) — emit an explicit PreToolUse `allow`
+    decision so the interactive approval prompt is skipped. Every rule above
+    (A-D) still ran first; this only fires once an action has already
+    survived them, so the unattended builder runs licensed work without
+    prompts while still stopping dead on anything Rules A-D reject."""
     print(json.dumps({
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
             "permissionDecision": "allow",
             "permissionDecisionReason":
-                "london-bdd guard: licensed under autonomy: autonomous",
+                "london-bdd guard: licensed under inner: batch",
         }
     }))
     sys.exit(0)
@@ -367,11 +386,11 @@ def main():
     s = parse_session(session_path) if session_path else None
     marker, marker_root = find_merge_marker(cwd)
     root = session_root or marker_root or os.path.abspath(cwd)
-    # Only ever true with an active session declaring it explicitly — a
-    # missing/assisted session always falls through to allow_silently(),
-    # preserving today's per-call prompting for human-paced runs.
-    autonomous = bool(s and s["autonomy"] == "autonomous")
-    finish = allow_explicitly if autonomous else allow_silently
+    # Only ever true with an active session — no session at all always
+    # falls through to allow_silently(), and `inner: granular` keeps the
+    # per-call prompting a human-paced run relies on.
+    batch = bool(s and s["inner"] == "batch")
+    finish = allow_explicitly if batch else allow_silently
 
     if kind == "bash":
         cmd = tool_input.get("command", "")
@@ -414,8 +433,8 @@ def main():
                           "tmp branch, while checked out on its "
                           "base_branch, with an exact "
                           "'git merge --squash <tmp>'.")
-        finish()  # no objection — allow silently (assisted) or explicitly
-                  # (autonomous), same rules either way
+        finish()  # no objection — allow silently (granular) or explicitly
+                  # (batch), same rules either way
 
     # kind == "edit"
     if not session_path:
@@ -468,8 +487,8 @@ def main():
             block(f"Rule B ({s['mode']}): '{r}' is outside the declared "
                   "scope. Extend scope explicitly or log to /debt — no "
                   "silent 'while we're here'.")
-    finish()  # survived Rules A-D — allow silently (assisted) or explicitly
-              # (autonomous)
+    finish()  # survived Rules A-D — allow silently (granular) or explicitly
+              # (batch)
 
 
 if __name__ == "__main__":

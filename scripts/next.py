@@ -30,6 +30,17 @@ def compute(s):
         return "/decompose", f"{tag} naming collaborators for the slice"
 
     if phase == "inner":
+        tag = f"{tag} ({s['inner']})"
+        open_tests = [t for t in s["tests"] if t["status"] != "done"]
+        if open_tests:
+            head = open_tests[0]
+            if s["current_failing_test"]:
+                return "/inner", (f"{tag} {head['name']} has a recorded "
+                                   "failing test — continue the cycle "
+                                   "(implement, refactor, commit)")
+            return "/inner", (f"{tag} {head['name']} "
+                               f"({head['collaborator']}) is next — "
+                               f"{len(open_tests)} test(s) left")
         pending = [c for c in s["collaborators"] if c["status"] != "done"]
         if not pending:
             return "/review", (f"{tag} collaborator queue is drained but "
@@ -39,7 +50,7 @@ def compute(s):
         if s["current_failing_test"]:
             return "/inner", (f"{tag} {head['role']} has a recorded "
                                "failing test — continue the cycle "
-                               "(implement, review, commit)")
+                               "(implement, refactor, commit)")
         return "/inner", (f"{tag} {head['role']} is next "
                            f"({len(pending)} collaborator(s) left)")
 
