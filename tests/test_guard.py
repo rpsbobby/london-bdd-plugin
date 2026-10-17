@@ -436,7 +436,7 @@ def test_silent_bash_write_to_session_yml_when_no_active_slice(repo):
 # normal permission prompt for every Edit/Write/Bash call — the guard only
 # ever blocks or stays silent. `inner: batch` (the default when the field
 # is absent) hands the test list to an unattended builder subagent, so
-# once an action survives Rules A-D the guard must say so explicitly (a
+# once an action survives Rules A-E the guard must say so explicitly (a
 # PreToolUse `allow` decision on stdout), not just decline to object.
 
 def test_licensed_edit_stays_silent_when_granular(repo):
@@ -494,7 +494,7 @@ def test_bash_explicitly_allowed_when_batch(repo):
 
 
 def test_rebase_still_blocked_when_batch(repo):
-    """Rules A-D are never relaxed by batch mode — it only removes the
+    """Rules A-E are never relaxed by batch mode — it only removes the
     prompt for what the rules already license."""
     main_br, tmp_br = open_slice(repo, "x", phase="done", inner="batch")
     write_marker(repo, tmp_br, main_br)
@@ -569,3 +569,139 @@ def test_blocks_inner_greenfield_without_a_planned_test_list(repo):
     assert code == 2
     assert "Rule D" in err
     assert "test" in err.lower()
+
+
+# ---- Rule E: every slice commit runs the checks -----------------------
+#
+# The repo's own git hooks run on every commit, so the guard's job is to
+# stop the agent skipping them. On top of that it runs the tests in the
+# slice's scope itself, from session.yml's `checks.tests` template, and
+# blocks the commit if they fail.
+
+# Runs each in-scope file as a python script; any non-zero exit fails.
+RUN_EACH = "sh -c 'for f; do python3 \"$f\" || exit 1; done' _ {files}"
+
+
+def write_file(repo, rel, text):
+    p = repo / rel
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(text)
+    return p
+
+
+PASSING = "raise SystemExit(0)\n"
+FAILING = "print('boom: expected 2 got 3')\nraise SystemExit(1)\n"
+
+
+@pytest.mark.parametrize("command", [
+    "git commit --no-verify -m cycle",
+    "git commit -n -m cycle",
+    "git commit -anm cycle",
+    "SKIP=ruff git commit -m cycle",
+    "git -c core.hooksPath=/dev/null commit -m cycle",
+    "HUSKY=0 git commit -m cycle",
+])
+def test_blocks_commit_that_bypasses_the_repo_hooks(repo, command):
+    open_slice(repo, "x")
+    code, err = guard(repo, "bash", command=command)
+    assert code == 2
+    assert "Rule E" in err
+
+
+def test_allows_commit_whose_message_merely_mentions_no_verify(repo):
+    open_slice(repo, "x")
+    code, _ = guard(repo, "bash",
+                     command='git commit -m "explain -n and --no-verify"')
+    assert code == 0
+
+
+def test_blocks_commit_when_pre_commit_config_has_no_installed_hook(repo):
+    write_file(repo, ".pre-commit-config.yaml", "repos: []\n")
+    open_slice(repo, "x")
+    code, err = guard(repo, "bash", command="git commit -m cycle")
+    assert code == 2
+    assert "pre-commit install" in err
+
+
+def test_allows_commit_when_pre_commit_hook_is_installed(repo):
+    write_file(repo, ".pre-commit-config.yaml", "repos: []\n")
+    write_file(repo, ".git/hooks/pre-commit", "#!/bin/sh\nexit 0\n")
+    open_slice(repo, "x")
+    code, _ = guard(repo, "bash", command="git commit -m cycle")
+    assert code == 0
+
+
+def test_blocks_commit_when_a_test_changed_in_the_slice_fails(repo):
+    open_slice(repo, "x", checks=f"\n  tests: {RUN_EACH}")
+    write_file(repo, "tests/test_order.py", FAILING)
+    run_git(repo, "add", "tests/test_order.py")
+    code, err = guard(repo, "bash", command="git commit -m cycle")
+    assert code == 2
+    assert "Rule E" in err
+    assert "boom: expected 2 got 3" in err
+
+
+def test_untracked_test_files_are_in_scope(repo):
+    """`git add -A && git commit` is one Bash call: the guard sees it
+    before the add, so untracked test files must count already."""
+    open_slice(repo, "x", checks=f"\n  tests: {RUN_EACH}")
+    write_file(repo, "tests/test_order.py", FAILING)
+    code, err = guard(repo, "bash", command="git add -A && git commit -m c")
+    assert code == 2
+    assert "boom" in err
+
+
+def test_allows_commit_when_the_tests_in_scope_pass(repo):
+    open_slice(repo, "x", checks=f"\n  tests: {RUN_EACH}")
+    write_file(repo, "tests/test_order.py", PASSING)
+    run_git(repo, "add", "tests/test_order.py")
+    code, _ = guard(repo, "bash", command="git commit -m cycle")
+    assert code == 0
+
+
+def test_tests_outside_the_slice_are_not_run(repo):
+    write_file(repo, "tests/test_legacy.py", FAILING)
+    run_git(repo, "add", "tests/test_legacy.py")
+    run_git(repo, "commit", "-q", "-m", "legacy")
+    open_slice(repo, "x", checks=f"\n  tests: {RUN_EACH}")
+    write_file(repo, "tests/test_order.py", PASSING)
+    code, _ = guard(repo, "bash", command="git add -A && git commit -m c")
+    assert code == 0
+
+
+def test_red_acceptance_test_is_out_of_scope_during_inner(repo):
+    open_slice(repo, "x", phase="inner", checks=f"\n  tests: {RUN_EACH}",
+               acceptance_test="\n  file: tests/acceptance/test_place.py"
+                               "\n  status: red")
+    write_file(repo, "tests/acceptance/test_place.py", FAILING)
+    code, _ = guard(repo, "bash", command="git add -A && git commit -m c")
+    assert code == 0
+
+
+def test_acceptance_test_is_in_scope_once_the_slice_closes(repo):
+    open_slice(repo, "x", phase="close", checks=f"\n  tests: {RUN_EACH}",
+               acceptance_test="\n  file: tests/acceptance/test_place.py"
+                               "\n  status: red")
+    write_file(repo, "tests/acceptance/test_place.py", FAILING)
+    code, err = guard(repo, "bash", command="git add -A && git commit -m c")
+    assert code == 2
+    assert "boom" in err
+
+
+def test_safe_net_suites_are_always_in_scope(repo):
+    write_file(repo, "tests/char/test_pricing.py", FAILING)
+    run_git(repo, "add", "tests/char/test_pricing.py")
+    run_git(repo, "commit", "-q", "-m", "net")
+    open_slice(repo, "x", mode="SAFE", checks=f"\n  tests: {RUN_EACH}",
+               net="\n  kind: existing\n  suites:"
+                   "\n    - tests/char/test_pricing.py\n  status: green")
+    code, err = guard(repo, "bash", command="git commit -m refactor")
+    assert code == 2
+    assert "boom" in err
+
+
+def test_no_checks_template_runs_no_tests(repo):
+    open_slice(repo, "x")
+    write_file(repo, "tests/test_order.py", FAILING)
+    code, _ = guard(repo, "bash", command="git add -A && git commit -m c")
+    assert code == 0

@@ -105,8 +105,8 @@ session.yml can carry state across that checkout. See `/commit-merge` and
   would otherwise stay silent. `granular` sessions fall through to
   Claude Code's normal interactive approval prompt on every
   Edit/Write/Bash call. `batch` sessions get an explicit PreToolUse
-  `allow` once an action has survived Rules A–D, so the unattended
-  builder isn't stopped for a click on every change. Rules A–D are never
+  `allow` once an action has survived Rules A–E, so the unattended
+  builder isn't stopped for a click on every change. Rules A–E are never
   relaxed by this. It only removes the prompt for what they already
   license.
 - `tests` is the build list. `/decompose` writes it (`origin: planned`)

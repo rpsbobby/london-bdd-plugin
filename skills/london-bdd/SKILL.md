@@ -181,7 +181,7 @@ the agent runs the squash-merge itself, authorized fresh every invocation
 — never a persisted "always auto". The guard hook enforces all of this;
 commands check first anyway — commands are polite, hooks are absolute.
 
-## The four hard rules (hook-enforced)
+## The five hard rules (hook-enforced)
 
 - **A.** A production edit requires a license — any one of: a recorded
   failing test in `.bdd/session.yml` (the normal red); phase `close`
@@ -220,7 +220,7 @@ commands check first anyway — commands are polite, hooks are absolute.
    step matters.
 8. Batch mode never overrides an escalation trigger: a `block`-severity
    finding, a test that stays red after honest attempts, a design
-   question the map didn't answer, or a hook rejection (Rules A–D) all
+   question the map didn't answer, or a hook rejection (Rules A–E) all
    stop the loop and hand back to the human.
 
 ## Common failure modes

@@ -110,7 +110,7 @@ builder. Newly approved tests run through `/inner` cycles.
 - The builder or implementer stays red after honest attempts.
 - The builder reports a `design-question`.
 - A `block`-severity finding.
-- A hook rejects an action (Rules A–D). The loop's model of state has
+- A hook rejects an action (Rules A–E). The loop's model of state has
   drifted from the guard's, so don't retry blindly.
 - Git state is unexpected (wrong branch, dirty tree, detached HEAD).
 

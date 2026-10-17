@@ -107,7 +107,7 @@ when the slice moves to `close`.
 - `stayed-red`: no green after three honest attempts.
 - `design-question`: the approved test can't be written against the
   agreed map.
-- `hook-rejection`: the guard blocked an action (Rules A-D). Your model
+- `hook-rejection`: the guard blocked an action (Rules A-E). Your model
   of state has drifted from the guard's, so don't retry blindly.
 - `git-state-unexpected`: wrong branch, dirty tree, or detached HEAD.
 - `turn-budget`: the budget guard tripped before a new test.

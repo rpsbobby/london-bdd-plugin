@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """london-bdd guard hook.
 
-Enforces the four hard rules when a .bdd/session.yml slice is active:
+Enforces the five hard rules when a .bdd/session.yml slice is active:
 
   A. No production edit without a license: a recorded failing test, phase
      `close`, or SAFE mode with a green net. The net is declared in
@@ -23,6 +23,12 @@ Enforces the four hard rules when a .bdd/session.yml slice is active:
      directly, outside Claude Code entirely, always bypasses every rule
      here — that's expected: this hook governs the agent's own tool
      calls, not the developer's own editor.
+
+  E. Every agent commit inside a slice runs the checks: the repo's own git
+     hooks can't be skipped (--no-verify / -n, core.hooksPath, SKIP= and
+     friends), a .pre-commit-config.yaml must have its hook installed, and
+     the tests in the slice's scope must pass (see tests_in_scope) when
+     session.yml declares a `checks.tests` command template.
 
 Note on the marker file: `git checkout <base_branch>` removes
 `.bdd/session.yml` from the working tree (it's tracked only on the tmp
@@ -49,6 +55,7 @@ import fnmatch
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 
@@ -77,7 +84,8 @@ def parse_session(path):
          "current_failing_test": None, "scope_in": [], "scope_out": [],
          "phase": None, "char_status": None, "net_status": None,
          "net_kind": None, "acceptance_status": None, "inner": "batch",
-         "collaborators": [], "tests": [], "cycle": 0}
+         "collaborators": [], "tests": [], "cycle": 0,
+         "checks_tests": None, "acceptance_file": None, "net_suites": []}
     try:
         text = open(path, encoding="utf-8").read()
     except OSError:
@@ -109,10 +117,24 @@ def parse_session(path):
         if st: s["net_status"] = st.group(1)
         k = re.search(r"\bkind:\s*(\S+)", m.group(1))
         if k: s["net_kind"] = k.group(1)
+        su = re.search(r"\bsuites:[ \t]*\n((?:[ \t]+-.*\n?)*)", m.group(1))
+        if su:
+            s["net_suites"] = re.findall(
+                r"^[ \t]+-[ \t]*(\S.*?)[ \t]*(?:#.*)?$", su.group(1), re.M)
     m = re.search(r"^acceptance_test:\s*\n((?:[ \t]+.*\n?)*)", text, re.M)
     if m:
         st = re.search(r"\bstatus:\s*(\S+)", m.group(1))
         if st: s["acceptance_status"] = st.group(1)
+        f = re.search(r"\bfile:\s*(\S+)", m.group(1))
+        if f: s["acceptance_file"] = f.group(1)
+    m = re.search(r"^checks:\s*\n((?:[ \t]+.*\n?)*)", text, re.M)
+    if m:
+        tp = re.search(r"^[ \t]+tests:[ \t]*(\S.*?)[ \t]*$", m.group(1), re.M)
+        if tp:
+            tpl = tp.group(1)
+            if len(tpl) > 1 and tpl[0] == tpl[-1] and tpl[0] in "'\"":
+                tpl = tpl[1:-1]
+            s["checks_tests"] = tpl
     m = re.search(r"^collaborators:\s*\n((?:[ \t]+.*\n?)*)", text, re.M)
     if m:
         for role_m in re.finditer(
@@ -314,6 +336,110 @@ def bash_targets_session_yml(cmd):
     return False
 
 
+# `git` plus any `-c key=value` options before the subcommand, so
+# `git -c core.hooksPath=x commit` is still recognised as a commit.
+GIT = r"\bgit(?:\s+-c\s+\S+)*\s+"
+HOOK_SKIP_ENV = ("SKIP", "HUSKY", "LEFTHOOK", "PRE_COMMIT_ALLOW_NO_CONFIG")
+TEST_FILE = re.compile(
+    r"(^test_.*\.\w+$|_test\.\w+$|\.test\.\w+$|\.spec\.\w+$|_spec\.\w+$"
+    r"|Tests?\.\w+$)")
+CHECKS_TIMEOUT = 540  # under hooks.json's 600s, so the guard reports it
+
+
+def without_quoted(cmd):
+    """The command with quoted strings emptied — a commit message that
+    mentions --no-verify isn't a bypass."""
+    return re.sub(r"'[^']*'|\"(?:\\.|[^\"\\])*\"", "''", cmd)
+
+
+def hook_bypass(cmd):
+    """Why this commit would skip the repo's git hooks, or None."""
+    bare = without_quoted(cmd)
+    if re.search(r"--no-verify\b", bare):
+        return "--no-verify"
+    m = re.search(GIT + r"commit\b([^;&|]*)", bare)
+    if m and re.search(r"(?:^|\s)-[a-zA-Z]*n[a-zA-Z]*(?=\s|$)", m.group(1)):
+        return "-n (--no-verify)"
+    if re.search(r"\bcore\.hooksPath\b", bare):
+        return "core.hooksPath override"
+    for var in HOOK_SKIP_ENV:
+        if re.search(rf"(?:^|[\s;&|]){var}=", bare):
+            return f"{var}= environment override"
+    return None
+
+
+def git_out(root, *args):
+    try:
+        proc = subprocess.run(["git", *args], cwd=root, capture_output=True,
+                              text=True, timeout=10)
+    except Exception:
+        return ""
+    return proc.stdout if proc.returncode == 0 else ""
+
+
+def pre_commit_hook_missing(root):
+    """A .pre-commit-config.yaml whose git hook was never installed means
+    the repo's hooks silently don't run."""
+    if not os.path.isfile(os.path.join(root, ".pre-commit-config.yaml")):
+        return False
+    hooks = git_out(root, "rev-parse", "--git-path", "hooks").strip()
+    if not hooks:
+        return False
+    return not os.path.isfile(os.path.join(root, hooks, "pre-commit"))
+
+
+def tests_in_scope(s, root):
+    """Test files this slice touched (committed, staged, unstaged, or
+    untracked — the guard runs before a `git add` in the same command),
+    plus a SAFE/FULL_REFACTOR net's suites. The acceptance test is left out
+    until phase close: during the inner loop it is red on purpose."""
+    changed = set()
+    base = git_out(root, "merge-base", s["base_branch"] or "", "HEAD").strip()
+    if base:
+        changed.update(git_out(root, "diff", "--name-only", base).split())
+    changed.update(git_out(root, "ls-files", "--others",
+                           "--exclude-standard").split())
+    files = {f for f in changed
+             if TEST_FILE.search(os.path.basename(f))
+             and not f.startswith(".bdd/")
+             and os.path.exists(os.path.join(root, f))}
+    if s["acceptance_file"]:
+        if s["phase"] in ("close", "done"):
+            if os.path.exists(os.path.join(root, s["acceptance_file"])):
+                files.add(s["acceptance_file"])
+        else:
+            files.discard(s["acceptance_file"])
+    if s["mode"] in ("SAFE", "FULL_REFACTOR"):
+        files.update(x for x in s["net_suites"]
+                     if os.path.exists(os.path.join(root, x)))
+    return sorted(files)
+
+
+def run_tests_in_scope(s, root):
+    """Runs checks.tests over the tests in scope. Returns a block message
+    if they fail, None if they pass or there's nothing to run."""
+    files = tests_in_scope(s, root)
+    if not s["checks_tests"] or not files:
+        return None
+    args = " ".join(shlex.quote(f) for f in files)
+    tpl = s["checks_tests"]
+    cmd = tpl.replace("{files}", args) if "{files}" in tpl else f"{tpl} {args}"
+    try:
+        proc = subprocess.run(cmd, shell=True, cwd=root, capture_output=True,
+                              text=True, timeout=CHECKS_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        return (f"Rule E: the tests in scope didn't finish within "
+                f"{CHECKS_TIMEOUT}s — `{cmd}`. Narrow checks.tests in "
+                "session.yml or speed the tests up.")
+    if proc.returncode == 0:
+        return None
+    tail = "\n".join((proc.stdout + proc.stderr).splitlines()[-80:])
+    return (f"Rule E: the tests in scope fail, so this commit is blocked. "
+            f"Ran `{cmd}` (exit {proc.returncode}):\n{tail}\n"
+            "Fix them and commit again. Don't narrow the scope to get "
+            "past this.")
+
+
 def block(msg):
     sys.stderr.write("[london-bdd guard] " + msg + "\n")
     sys.exit(2)
@@ -333,7 +459,7 @@ def allow_explicitly():
     decision so the interactive approval prompt is skipped. Every rule above
     (A-D) still ran first; this only fires once an action has already
     survived them, so the unattended builder runs licensed work without
-    prompts while still stopping dead on anything Rules A-D reject."""
+    prompts while still stopping dead on anything Rules A-E reject."""
     print(json.dumps({
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
@@ -400,13 +526,13 @@ def main():
                   "the guard can validate the target phase. (Reading or "
                   "archiving the file via Bash is unaffected; this only "
                   "blocks redirect/tee writes at that exact path.)")
-        if re.search(r"\bgit\s+(commit|merge|rebase)\b", cmd):
+        if re.search(GIT + r"(commit|merge|rebase)\b", cmd):
             br = git_branch(root)
             sibling = sibling_tmp_branch(root, br)
             if not session_path and not marker and not sibling:
                 sys.exit(0)  # not a slice's tmp, main, or pending merge -> silent
             landing = bool(marker) and br == marker["base_branch"]
-            if re.search(r"\bgit\s+commit\b", cmd) and not landing:
+            if re.search(GIT + r"commit\b", cmd) and not landing:
                 if s and s["branch"] and br != s["branch"]:
                     block(f"Rule C: commits belong on '{s['branch']}' "
                           f"(currently on '{br or 'unknown'}'). Check out the "
@@ -415,10 +541,10 @@ def main():
                     block("Rule C: agent commits are allowed only on a "
                           "feature/<slice>-tmp branch, or the merge-landing "
                           "commit authorized via /commit-merge --auto.")
-            if re.search(r"\bgit\s+rebase\b", cmd):
+            if re.search(GIT + r"rebase\b", cmd):
                 block("Rule C: rebases are the developer's manual action, "
                       "never the agent's.")
-            if re.search(r"\bgit\s+merge\b", cmd):
+            if re.search(GIT + r"merge\b", cmd):
                 squash_src = re.search(r"--squash\s+(\S+)", cmd)
                 authorized = (
                     landing
@@ -433,6 +559,21 @@ def main():
                           "tmp branch, while checked out on its "
                           "base_branch, with an exact "
                           "'git merge --squash <tmp>'.")
+            if s and re.search(GIT + r"commit\b", cmd) and not landing:
+                # Rule E — the repo's hooks run, and the tests in scope pass
+                bypass = hook_bypass(cmd)
+                if bypass:
+                    block(f"Rule E: commits in a slice must run the repo's "
+                          f"git hooks — remove the {bypass}. Fix what the "
+                          "hooks report instead of skipping them.")
+                if pre_commit_hook_missing(root):
+                    block("Rule E: this repo has a .pre-commit-config.yaml "
+                          "but its git hook isn't installed, so the hooks "
+                          "wouldn't run. Run `pre-commit install`, then "
+                          "commit again.")
+                err = run_tests_in_scope(s, root)
+                if err:
+                    block(err)
         finish()  # no objection — allow silently (granular) or explicitly
                   # (batch), same rules either way
 
@@ -487,7 +628,7 @@ def main():
             block(f"Rule B ({s['mode']}): '{r}' is outside the declared "
                   "scope. Extend scope explicitly or log to /debt — no "
                   "silent 'while we're here'.")
-    finish()  # survived Rules A-D — allow silently (granular) or explicitly
+    finish()  # survived Rules A-E — allow silently (granular) or explicitly
               # (batch)
 
 

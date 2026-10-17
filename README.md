@@ -184,7 +184,7 @@ agents/builder.md              Sonnet, builds the test list (batch mode),
                                 proposes discovery
 agents/implementer.md          Haiku, minimum code, no test edits (granular)
 agents/reviewer.md             Sonnet, critique only (granular)
-hooks/hooks.json + scripts/    the four hard rules + next.py (/status)
+hooks/hooks.json + scripts/    the five hard rules + next.py (/status)
 adr/                           architecture decisions for the plugin itself
 tests/test_guard.py            regression suite for the guard hook (pytest)
 tests/test_next.py             regression suite for /status (pytest)
