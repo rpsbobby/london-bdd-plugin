@@ -521,7 +521,7 @@ def test_no_active_slice_stays_silent(repo):
 # granular mode both work it. Close is earned by draining that list, not
 # just by marking collaborators done.
 
-def test_list(*items):
+def yaml_tests(*items):
     """items: (name, collaborator, origin, status) tuples."""
     return "".join(
         f"\n  - name: {n}\n    collaborator: {c}\n    origin: {o}"
@@ -531,7 +531,7 @@ def test_list(*items):
 def test_blocks_close_with_an_unfinished_planned_test(repo):
     open_slice(repo, "x", phase="inner",
                **{"collaborators": "\n  - role: A\n    status: done",
-                  "tests": test_list(
+                  "tests": yaml_tests(
                       ("should_save", "A", "planned", "done"),
                       ("should_reject_empty", "A", "planned", "pending"))})
     code, err = edit_session(repo, "close")
@@ -543,7 +543,7 @@ def test_blocks_close_with_an_unfinished_planned_test(repo):
 def test_blocks_close_with_an_unfinished_discovered_test(repo):
     open_slice(repo, "x", phase="inner",
                **{"collaborators": "\n  - role: A\n    status: done",
-                  "tests": test_list(
+                  "tests": yaml_tests(
                       ("should_save", "A", "planned", "done"),
                       ("should_handle_duplicate", "A", "discovered", "red"))})
     code, err = edit_session(repo, "close")
@@ -554,7 +554,7 @@ def test_blocks_close_with_an_unfinished_discovered_test(repo):
 def test_allows_close_when_every_test_is_done(repo):
     open_slice(repo, "x", phase="inner",
                **{"collaborators": "\n  - role: A\n    status: done",
-                  "tests": test_list(
+                  "tests": yaml_tests(
                       ("should_save", "A", "planned", "done"),
                       ("should_handle_duplicate", "A", "discovered", "done"))})
     code, _ = edit_session(repo, "close")
