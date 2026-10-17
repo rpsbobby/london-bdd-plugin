@@ -72,8 +72,9 @@ the interface/port definitions it references, the language notes reference
 relevant to the stack.
 
 **`backend: agent` (default).** Dispatch the `london-bdd:implementer` agent
-with that context. It writes the minimum production code, runs the tests,
-reports.
+with that context, passing `implementer.model` from session.yml (if set) as
+the Agent tool's `model` override — otherwise its frontmatter model (Haiku)
+applies. It writes the minimum production code, runs the tests, reports.
 
 **`backend: codex`.** Confirm `codex` is on `PATH` first — if it's not,
 this is a protocol error, escalate (do not silently fall back to `agent`).

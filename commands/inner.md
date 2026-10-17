@@ -63,7 +63,9 @@ backends satisfy the same contract — see
 - The language notes reference relevant to the stack
 
 **`backend: agent` (default) — Haiku subagent.** Dispatch the
-`london-bdd:implementer` agent with the context above. It writes the
+`london-bdd:implementer` agent with the context above, passing
+`implementer.model` from session.yml (if set) as the Agent tool's `model`
+override — otherwise its frontmatter model (Haiku) applies. It writes the
 minimum production code, runs the tests, reports.
 
 **`backend: codex` — OpenAI Codex CLI.** Confirm `codex` is on `PATH`

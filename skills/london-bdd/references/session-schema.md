@@ -20,8 +20,9 @@ autonomy: assisted                  # assisted (default) | autonomous
 implementer:                        # GREEN-step executor (optional block;
   backend: agent                    #   absent = agent, same as today)
   model: null                        # backend: agent (default) | codex —
-                                    # model: optional --model passthrough,
-                                    # only used when backend: codex
+                                    # model: optional override; agent: an
+                                    # Agent-tool alias (haiku|sonnet|opus),
+                                    # codex: passed as --model
                                     # (see references/implementer-backends.md)
 branch: feature/place-order-tmp     # expected working branch
 base_branch: feature/place-order-main
@@ -111,9 +112,10 @@ session.yml can carry state across that checkout. See `/commit-merge` and
   `references/implementer-backends.md` for exactly how it checks Codex
   didn't touch tests or `.bdd/`, and re-runs the test command rather than
   trusting Codex's own claim. `implementer.model` is passed straight
-  through as `codex exec --model <value>` when set (only read when
-  `backend: codex`); leave it unset to use Codex's own configured
-  default. `backend` itself follows the same discipline as `autonomy`:
+  through as `codex exec --model <value>` when set (`backend: codex`), or
+  as the Agent tool's `model` override (`backend: agent`, an alias such as
+  `sonnet`); leave it unset for the backend's default (Haiku for `agent`,
+  Codex's own config for `codex`). `backend` itself follows the same discipline as `autonomy`:
   set once at slice start (`/scenario` or `/refactor-scope`), never
   silently upgraded — switching backends mid-slice is an explicit
   checkpoint with the user. The `codex` backend requires the `codex` CLI
