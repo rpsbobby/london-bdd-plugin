@@ -1,9 +1,9 @@
 ---
 name: decompose
-description: Break the slice into collaborators — name roles in DDD language, sketch interface boundaries, agree the sequence before any code. Runs between the outer red and the inner loop.
+description: Break the slice into collaborators and the tests that drive each one — name roles in DDD language, sketch interface boundaries, list the planned unit tests, agree the whole map with the user once before any code. Runs between the outer red and the inner loop.
 ---
 
-# /decompose — Discover Collaborators, Name Roles
+# /decompose — Discover Collaborators, Plan the Tests
 
 Read the `london-bdd` skill and `references/collaborator-discovery.md`.
 
@@ -18,30 +18,30 @@ Read the `london-bdd` skill and `references/collaborator-discovery.md`.
    object need to ask for or tell?* Name each discovered role by
    **capability, not implementation** (`OrderRepository`, not
    `SqliteOrderStore`), in the project's ubiquitous language.
-2. **`autonomy: assisted` (default) — confirm every role name with the
-   user before recording it; names are design decisions.**
-   **`autonomy: autonomous` — name roles yourself against the ubiquitous
-   language and the sanity checks below; no per-role confirmation.** The
-   full map still gets shown to the user in step 6, and any role name
-   that drifts from the domain glossary is exactly the kind of thing the
-   `/inner` reviewer step will flag.
-3. Sketch the minimal interface per role: only the methods actually
+2. Sketch the minimal interface per role: only the methods actually
    called, starting with one.
+3. Per role, list the unit tests that drive it, as `should_` names, one
+   behaviour each, outside-in. Cover what the acceptance test needs, plus
+   the obvious sad path per role. Don't chase every corner case:
+   discovery at the end of the inner loop exists for that.
 4. Sanity checks (from the skill): >3–4 collaborators on one class →
    challenge; chain deeper than 3 levels → slice thinner.
-5. Order the queue outside-in (entry point first) and write it to
-   `collaborators:` in session.yml, all `status: pending`.
-   Set `phase: inner`.
-6. Commit: `docs: collaborator map — <slice>` (the map goes in
-   `.bdd/scope-<slice>.md` or the session file — no production code).
-7. `assisted`: tell the user next command is `/inner`, which will work
-   the queue one collaborator at a time. `autonomous`: announce the map
-   and proceed directly into `/inner`, working the queue without waiting
-   for the user to re-invoke it.
+5. **Present the whole map at once: roles, interfaces, tests. The user
+   approves or edits it as one unit.** Names are design decisions, so
+   nothing is recorded until they approve. One approval, not one per
+   role.
+6. Write to session.yml: `collaborators:` ordered outside-in, all
+   `status: pending`; `tests:` in build order, each with `name`,
+   `collaborator`, `origin: planned`, `status: pending`;
+   `discovery_rounds: 0`. Set `phase: inner`.
+7. Commit: `docs: collaborator map — <slice>` (the map goes in
+   `.bdd/scope-<slice>.md` or the session file, with no production code).
+8. Tell the user the next command is `/inner`: in batch mode it builds
+   the whole list, in granular mode one test per call.
 
 ## Rules
 
-- No production code, no interfaces committed as code yet — the inner loop
+- No production code, no interfaces committed as code yet: the inner loop
   drives them into existence. This is a map, not a skeleton.
 - In FULL_REFACTOR mode, the map must respect the Clean Architecture
   boundary rule in the skill (UI knows nothing of domain; domain depends

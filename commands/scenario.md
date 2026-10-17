@@ -21,6 +21,9 @@ before proceeding.
 
 Work through these WITH the user, one at a time:
 
+0. **Backlog first.** If `docs/backlog.md` exists, show its entries:
+   AT candidates earlier slices discovered. The user may pick one as this
+   slice, or start something new.
 1. **Behaviour in one sentence**, in business language. Push back on
    technical framing ("insert row" → "customer places an order").
 2. **Ubiquitous language check** — do the nouns/verbs match the domain
@@ -42,25 +45,20 @@ Work through these WITH the user, one at a time:
    (DSL-driven, Given/When/Then, **no mocks, no test doubles of our own
    code**). It must compile and fail for the right reason (behaviour
    absent, not setup error). Run it and show the output.
-4. **Ask the autonomy question:** "Run `/decompose` and `/inner` assisted
-   (pause for you at each role and each cycle — default), or autonomous
-   (I drive the collaborator queue unattended, stopping only on a
-   blocking review finding, a stalled implementer, or a hook rejection)?"
-   Default to `assisted` on no answer. This never applies to this command,
-   to `/review`, or to `/commit-merge` — those stay human-paced either way.
-5. **Ask the implementer backend question:** "Run the GREEN step with the
-   built-in `agent` backend (Haiku subagent — default), or delegate it to
-   the `codex` backend (runs `codex exec`, OpenAI's Codex CLI, non-
-   interactively — needs `codex` on `PATH` and already authenticated)?"
-   Default to `agent` on no answer. If `codex`, ask which model to pass
-   (optional — leave unset to use Codex's own configured default). See
-   `references/implementer-backends.md`.
-6. Create `.bdd/session.yml`:
+4. **Ask the inner-loop question:** "Build the approved test list in
+   `batch` (one builder agent builds it all, then you and I review the
+   result and its discovery proposals: default), or `granular` (one test
+   per `/inner` call, pausing for you at each step)?" Default to `batch`
+   on no answer. Either way you approve the test list at `/decompose`
+   first, and this command, `/review`, and `/commit-merge` stay
+   human-paced.
+5. Create `.bdd/session.yml`:
    `mode: GREENFIELD`, `phase: decompose`, `acceptance_test.status: red`,
-   `autonomy` from step 4, `implementer.backend` (and `implementer.model`
-   if `codex`) from step 5, branch fields set, empty collaborator list.
-7. Commit on feature/<slice>-tmp: `test: failing acceptance test — <slice>`
-8. Announce: `🔴 AT: <behaviour>` and tell the user the next command is
+   `inner` from step 4, branch fields set, empty collaborator list.
+6. Commit on feature/<slice>-tmp: `test: failing acceptance test — <slice>`
+   (if the slice came from `docs/backlog.md`, remove that entry in the
+   same commit).
+7. Announce: `🔴 AT: <behaviour>` and tell the user the next command is
    `/decompose`.
 
 ## Rules

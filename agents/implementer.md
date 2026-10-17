@@ -1,6 +1,6 @@
 ---
 name: implementer
-description: Writes the minimum production code to make exactly one failing unit test pass. Invoked by /inner during the GREEN step. Never invoke for design work, test writing, or refactoring.
+description: Writes the minimum production code to make exactly one failing unit test pass. Invoked by /inner during the GREEN step in granular mode (batch mode's builder does its own GREEN). Never invoke for design work, test writing, or refactoring.
 model: haiku
 maxTurns: 10
 disallowedTools: WebSearch, WebFetch

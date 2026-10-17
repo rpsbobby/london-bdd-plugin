@@ -41,9 +41,9 @@ All commands live under the `/london-bdd:` prefix.
 | Command | Phase | What it does |
 |---|---|---|
 | `/london-bdd:characterise` | Existing code with a net gap, before change | Locks in CURRENT behaviour (right or wrong) as a regression net around the uncovered scope. Skipped when `/refactor-scope` declared existing suites as the net. Re-run post-slice to verify behaviour preserved. |
-| `/london-bdd:decompose` | Between outer red and inner loop | Discovers collaborators, names roles in DDD language, sketches interface boundaries, agrees the sequence — before any code. |
-| `/london-bdd:inner` | Inner loop, ×N | One full cycle for the next collaborator: failing unit test with you, minimum implementation (implementer backend — Haiku agent by default, or OpenAI's Codex CLI via `codex exec`), review and refactor (reviewer agent), one commit on feature/<slice>-tmp. |
-| `/london-bdd:review` | Collaborator queue empty | Slice-level gate: reviewer agent audits the whole diff, clean-code pass, distil-candidate triage, then closes the outer loop. |
+| `/london-bdd:decompose` | Between outer red and inner loop | Discovers collaborators, names roles in DDD language, sketches interface boundaries, and lists the unit tests that drive each one. You approve the whole map once, before any code. |
+| `/london-bdd:inner` | Inner loop | Builds the approved test list. **batch** (default): one Sonnet builder agent builds it all (red, green, refactor, commit per test), then proposes missing UT/AT behaviour for you and the driver to review. **granular**: one human-paced test per call (Haiku implementer, Sonnet reviewer). |
+| `/london-bdd:review` | Test list drained | Slice-level gate: slice review and clean-code pass, one automatic AT-discovery pass (follow-ups go to `docs/backlog.md`), distil-candidate triage, then closes the outer loop. |
 | `/london-bdd:commit-merge` | `phase: done` | Lands the slice: squash-merges feature/<slice>-tmp onto feature/<slice>-main. Manual by default (prints the commands); `--auto` runs the merge itself, authorized fresh each invocation. Never pushes. |
 
 **Support** — invoked directly at any time, or by the loop commands:
@@ -70,7 +70,8 @@ All commands live under the `/london-bdd:` prefix.
   pushes are always human.
 - **D.** Phase transitions in `.bdd/session.yml` are forward-only and
   earned: entering `inner`/`close`/`done` requires the actual
-  preconditions (outer net exists, collaborator queue drained, etc.) —
+  preconditions (outer net exists, test list recorded, every test done,
+  etc.) —
   a step can't be skipped just by writing the field.
 
 The guard is silent when no `.bdd/session.yml` slice is active.
@@ -79,51 +80,26 @@ The guard is silent when no `.bdd/session.yml` slice is active.
 
 | Work | Who |
 |---|---|
-| Scenario, decomposition, unit tests, review decisions | Main session + you |
-| Minimum implementation | implementer backend (can't touch tests): `agent` (Haiku, default) or `codex` (OpenAI Codex CLI) |
-| Design critique | `reviewer` agent (Sonnet, read-only) |
-| Unattended queue drain (`autonomy: autonomous` only) | `runner` agent (Sonnet, dispatches `implementer`+`reviewer` each cycle) |
+| Scenario, decomposition, review, discovery triage | Main session (driver) + you |
+| Build the test list (`inner: batch`, default) | `builder` agent (Sonnet): red, green, refactor, commit per test, then discovery proposals |
+| Minimum implementation (`inner: granular`) | `implementer` agent (Haiku, can't touch tests) |
+| Design critique (`inner: granular`) | `reviewer` agent (Sonnet, read-only). In batch mode the driver applies the same checklist |
 
-## Implementer backends — optionally delegate GREEN to Codex CLI
+## Inner loop — batch by default, granular when you want the wheel
 
-`implementer.backend` in `.bdd/session.yml` picks who does the GREEN step
-of `/inner`. `agent` (default, unset behaves exactly as before) dispatches
-the built-in `london-bdd:implementer` Haiku subagent. `codex` shells out
-to `scripts/codex_implementer.py` instead, which runs `codex exec`
-(OpenAI's Codex CLI) non-interactively in `--sandbox workspace-write`
-mode. Because Codex is already a full coding agent rather than a bare
-model call, the script doesn't mediate its file writes — it snapshots
-`git status` before and after instead, treats any touch to a test file or
-`.bdd/` as a violation that forces escalation rather than a normal red,
-and re-runs the test command itself rather than trusting Codex's own
-claim. `implementer.model`, if set, is passed through as `codex exec
---model <value>`; leave it unset to use Codex's own configured default.
-Requires the `codex` CLI on `PATH` and already authenticated (`codex
-login`); `/inner` stops and asks rather than silently falling back to
-`agent` if it's missing. Both backends are set once at slice start
-(`/scenario` or `/refactor-scope` asks), same discipline as `autonomy`.
-See `skills/london-bdd/references/implementer-backends.md` for the full
-contract — including why this is a plain CLI call rather than an MCP
-server (Codex ships its own MCP server, `codex mcp-server`, if you
-want Codex available as an ad-hoc tool across a whole session instead)
-— and to add a third backend.
-
-## Autonomy — opt-in
-
-`/decompose` and `/inner` default to `autonomy: assisted`: every role
-name and every cycle pauses for you. Set `autonomy: autonomous` when
-starting a slice (`/scenario` or `/refactor-scope` asks) to let the agent
-drive the whole collaborator queue unattended instead. Three things
-always stop it and hand back to you, in either mode: a `block`-severity
-finding from the reviewer, an implementer that can't reach green, or a
-hook rejection. The outer red, `/review`, and `/commit-merge` are never
-autonomous — see `skills/london-bdd/references/session-schema.md`.
-
-The unattended drive itself runs inside a dedicated `runner` subagent,
-dispatched once by `/inner` rather than looping inline in the main
-session — same behaviour, same escalation triggers, kept off the main
-session's own context window. See
-`skills/london-bdd/references/autonomous-runner.md`.
+You approve the collaborators and their test list once, at `/decompose`.
+In **batch** mode (`inner: batch`, the default) `/inner` hands the whole
+list to one `builder` subagent. It runs red → green → refactor → commit
+for each test, then proposes what's still untested: unit-level corner
+cases, and acceptance-level scenarios when it has the context. The driver
+reviews the diff and the proposals with you. Approved unit tests get one
+more build round, with no further discovery. Acceptance candidates for
+this slice need your approval. Those for other slices land in
+`docs/backlog.md` for a later `/scenario`. **Granular** mode
+(`inner: granular`) keeps the per-test, human-paced cycle. Both modes
+stop and hand back on a `block` finding, a test that stays red, or a hook
+rejection. See `adr/ADR-001-batch-inner-loop.md` and
+`skills/london-bdd/references/test-discovery.md`.
 
 ## Branching
 
@@ -163,9 +139,7 @@ project scope commits the install to `.claude/settings.json` so teammates
 who clone your work repo are offered it automatically — this is the path
 for "if it works, it should speak for itself."
 
-**Requirements & upkeep:** `python3` on PATH (guard hook). Only needed if
-you opt into `implementer.backend: codex`: the `codex` CLI on PATH and
-already authenticated (no other dependency — the script is stdlib-only).
+**Requirements & upkeep:** `python3` on PATH (guard hook, stdlib-only).
 Commands and
 `SKILL.md` edits apply immediately; changes to hooks or agents need
 `/reload-plugins`. If skills don't appear after install, clear the cache
@@ -206,15 +180,14 @@ Domain glossary: docs/glossary.md (role names must match it)
 ```
 .claude-plugin/plugin.json     manifest
 commands/                      workflow entry points (thin)
-agents/implementer.md          Haiku, minimum code, no test edits
-agents/reviewer.md             Sonnet, critique only
-agents/runner.md               Sonnet, drives an autonomous queue drain,
-                                nest-dispatches implementer + reviewer
+agents/builder.md              Sonnet, builds the test list (batch mode),
+                                proposes discovery
+agents/implementer.md          Haiku, minimum code, no test edits (granular)
+agents/reviewer.md             Sonnet, critique only (granular)
 hooks/hooks.json + scripts/    the four hard rules + next.py (/status)
-scripts/codex_implementer.py   external implementer backend (optional, Codex CLI)
+adr/                           architecture decisions for the plugin itself
 tests/test_guard.py            regression suite for the guard hook (pytest)
 tests/test_next.py             regression suite for /status (pytest)
-tests/test_codex_implementer.py  regression suite for the codex backend's violation check
 skills/london-bdd/             knowledge layer + references
 ```
 
