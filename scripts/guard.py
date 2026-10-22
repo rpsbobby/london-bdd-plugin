@@ -238,7 +238,13 @@ def validate_phase_transition(s, new_phase):
                         f"net must be green first: {NET_FIX}.")
 
     if new_phase == "close":
-        if not s["collaborators"]:
+        # A refactor slice under a declared existing green net builds no
+        # new collaborators or tests; it has nothing to drain.
+        no_build_needed = (s["mode"] in ("SAFE", "FULL_REFACTOR")
+                           and s["net_kind"] == "existing"
+                           and net_status(s) == "green"
+                           and not s["tests"])
+        if not s["collaborators"] and not no_build_needed:
             return ("Rule D: cannot enter phase 'close' with no "
                     "collaborators recorded — the inner loop queue must be "
                     "worked and drained first (/inner).")
