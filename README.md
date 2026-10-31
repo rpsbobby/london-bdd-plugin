@@ -131,18 +131,18 @@ Installation is always two steps: register the marketplace, then install.
 
 **From GitHub (recommended):**
 ```
-/plugin marketplace add <you>/london-bdd
+/plugin marketplace add rpsbobby/london-bdd-plugin
 /plugin install london-bdd@london-bdd-marketplace
 /reload-plugins
 ```
-`<you>/london-bdd` is your `owner/repo`. The marketplace *name* comes from
+For a fork, use your own `owner/repo`. The marketplace *name* comes from
 the `name` field in `marketplace.json` (`london-bdd-marketplace`), which is
 what you install against — not the repo name.
 
 **From a local clone (for developing the plugin itself):**
 ```
-git clone https://github.com/<you>/london-bdd
-/plugin marketplace add ./london-bdd
+git clone https://github.com/rpsbobby/london-bdd-plugin
+/plugin marketplace add ./london-bdd-plugin
 /plugin install london-bdd@london-bdd-marketplace
 ```
 Local-path install is CLI-only today; the desktop app's plugin UI supports
@@ -157,25 +157,18 @@ for "if it works, it should speak for itself."
 Commands and
 `SKILL.md` edits apply immediately; changes to hooks or agents need
 `/reload-plugins`. If skills don't appear after install, clear the cache
-(`rm -rf ~/.claude/plugins/cache`), restart, reinstall.
+(`rm -rf ~/.claude/plugins/cache`), restart, reinstall. To pick up a
+new release, run `/plugin marketplace update london-bdd-marketplace`,
+then `/reload-plugins`.
 
-## Turning this into a tracked GitHub repo
+## Releasing
 
-The unzipped folder is already a complete repo layout — just version it:
-```
-cd london-bdd
-git init
-git add .
-git commit -m "feat: london-bdd plugin v0.1.0"
-git branch -M main
-git remote add origin https://github.com/<you>/london-bdd.git
-git push -u origin main
-```
-The repo must be **public** — Claude Code fetches marketplaces directly
-from GitHub. Once pushed, the install commands above work for you and
-anyone you share it with. Bump `version` in **both** `plugin.json` and (if
-you later pin versions there) the marketplace entry when you cut releases;
-if `version` is unset, the commit SHA is used as the version.
+Claude Code installs by `version` in `.claude-plugin/plugin.json`: while
+it stays the same, installed copies don't update, whatever lands on
+`main`. So bump it when a change should reach users: minor for a new
+command or rule, patch for a fix. If you ever pin versions in the
+`marketplace.json` entry, bump it there too. The repo must stay
+**public**, since Claude Code fetches marketplaces straight from GitHub.
 
 ## Suggested CLAUDE.md snippet
 
@@ -198,12 +191,18 @@ agents/builder.md              Sonnet, builds the test list (batch mode),
                                 proposes discovery
 agents/implementer.md          Haiku, minimum code, no test edits (granular)
 agents/reviewer.md             Sonnet, critique only (granular)
-hooks/hooks.json + scripts/    the five hard rules + next.py (/status)
+hooks/hooks.json               wires scripts/guard.py into the hooks
+scripts/guard.py               the five hard rules (Rules A–E)
+scripts/next.py                /status: what runs next, from session.yml
+scripts/session.py             writes and validates .bdd/session.yml
 adr/                           architecture decisions for the plugin itself
 tests/test_guard.py            regression suite for the guard hook (pytest)
-tests/test_next.py             regression suite for /status (pytest)
+tests/test_next.py             regression suite for /status
+tests/test_session.py          regression suite for session.py
+tests/test_commit_merge.py     /commit-merge --auto, run as documented
 skills/london-bdd/             knowledge layer + references
 ```
 
-`scripts/guard.py` is the one piece of this repo that's actual code rather
-than prompts — it has its own test suite: `python3 -m pytest tests/`.
+`scripts/` is the part of this repo that's actual code rather than
+prompts (stdlib-only Python); it has its own test suite:
+`python3 -m pytest tests/`.
