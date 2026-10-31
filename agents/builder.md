@@ -106,6 +106,13 @@ refused:
 - **A test in scope fails**: you broke behaviour an earlier test pins.
   Fix the production code, never the test.
 
+**Order matters.** The guard checks the tests before the Bash command
+runs, so it can't see files that command writes. Write test and
+implementation with Edit/Write calls first, run the tests, then commit in
+a separate Bash call holding only `git add` / `git commit`. Never generate
+files and commit in one command (heredoc + `git commit`): the guard sees
+the old, red state and refuses.
+
 Three refused attempts on the same commit → escalate `checks-failing`
 with the verbatim output.
 

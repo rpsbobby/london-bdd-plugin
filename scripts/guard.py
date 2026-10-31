@@ -471,7 +471,10 @@ def run_tests_in_scope(s, root):
     return (f"Rule E: the tests in scope fail, so this commit is blocked. "
             f"Ran `{cmd}` (exit {proc.returncode}):\n{tail}\n"
             "Fix them and commit again. Don't narrow the scope to get "
-            "past this.")
+            "past this. The guard checks before the command runs, so it "
+            "can't see files this same command writes: write test and "
+            "implementation with Edit/Write first, run the tests, then "
+            "commit in a separate Bash call that holds only git add/commit.")
 
 
 def block(msg):

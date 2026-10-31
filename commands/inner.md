@@ -105,7 +105,10 @@ green. Announce `🔵 Refactor`.
 Both commits run the commit checks (guard Rule E): the repo's git hooks
 and the tests in scope. A refused commit is feedback, not an escalation.
 Re-add files a hook rewrote, fix what it reports, and fix production code
-(never tests) when a test in scope fails. Never skip the hooks.
+(never tests) when a test in scope fails. Never skip the hooks. Write
+files with Edit/Write and run the tests first, then commit in a separate
+Bash call with only `git add`/`git commit`: the guard can't see files the
+same command writes.
 
 ### 5 — NEXT
 Open tests left → tell the user to run `/inner` again.

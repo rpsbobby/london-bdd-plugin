@@ -821,3 +821,10 @@ def test_template_without_outer_net_is_unchanged(repo):
     assert code == 2
     assert "FILES[tests/test_order.py]" in err
 
+
+def test_refused_commit_hints_at_separate_calls(repo):
+    open_slice(repo, "x", checks=f"\n  tests: {RUN_EACH}")
+    write_file(repo, "tests/test_order.py", FAILING)
+    code, err = guard(repo, "bash", command="git add -A && git commit -m c")
+    assert code == 2
+    assert "separate Bash call" in err
