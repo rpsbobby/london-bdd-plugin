@@ -38,6 +38,7 @@ Same inner loop, different outer nets. That symmetry is the design.
 
 ```
 GREENFIELD                          SAFE / FULL_REFACTOR (existing code)
+(/design    decisions, optional)
 /scenario   discuss, Gherkin, 🔴AT   /refactor-scope  scope + declare net
 /decompose  collaborators, roles     /characterise    ONLY if net gap
 /inner ×N   cycle per collaborator   (/decompose if FULL_REFACTOR)
@@ -48,6 +49,13 @@ GREENFIELD                          SAFE / FULL_REFACTOR (existing code)
 
 Every command ends by naming the next one — the loop always tells you
 where to go.
+
+`/design` is the optional step before `/scenario` for slices that need
+ground settled first: naming, the outer net's test environment, where
+artefacts live. It records decisions and open questions in
+`.bdd/design-<slice>.md`, which `/scenario` reads in Phase 0 and commits
+with the slice. It decides what sits around the slice, never the
+collaborators inside it: those are still discovered at `/decompose`.
 
 **The net is the license; characterisation is only one way to build it.**
 Characterisation-first is a technique for *untested* code. Code already
@@ -247,6 +255,7 @@ commands check first anyway — commands are polite, hooks are absolute.
 - `/status` — deterministic "what's next" lookup (`scripts/next.py`);
   run it anytime instead of re-deriving state from the repo
 - `references/session-schema.md` — the state file all commands share
+- `references/design-template.md` — the optional pre-slice design notes
 - `references/scope-template.md` — the refactor scope artifact
 - `references/characterisation.md` — Feathers techniques and probe-first
 - `references/approval-testing.md` — golden-master/approval testing and

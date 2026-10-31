@@ -15,8 +15,12 @@ before proceeding.
    - If a slice is active and `phase != done`: STOP. Tell the user which
      slice/phase is active and which command is expected next.
    - If the previous slice is `done`: move it to `.bdd/archive/<slice>.yml`
-     (move, not copy: no session.yml may remain before step 6 of Phase 1).
-2. Check git state: must be clean. Never auto-stash.
+     (move, not copy: no session.yml may remain before step 6 of Phase 1),
+     and its `.bdd/design-<slice>.md`, if any, to
+     `.bdd/archive/design-<slice>.md`.
+2. Check git state: must be clean. Never auto-stash. One exception: an
+   untracked `.bdd/design-<slice>.md` written by `/design` for this
+   slice. It stays untracked until the Phase 1 commit.
 
 ## Phase 0 — Discuss (do not skip, do not rush)
 
@@ -27,9 +31,19 @@ one message for a single confirmation (the user can still edit any of
 them). Split them back out only when one is genuinely open, e.g. a new
 term the glossary doesn't settle.
 
-0. **Backlog first.** If `docs/backlog.md` exists, show its entries:
-   AT candidates earlier slices discovered. The user may pick one as this
-   slice, or start something new.
+0. **Design notes, then backlog.** If `/design` left a
+   `.bdd/design-<slice>.md`, this slice is that one: read it, take its
+   slice name, and summarise its decisions and open questions in a few
+   lines. The decisions are agreed: build on them, don't reopen them
+   unless the user does or the behaviour talk shows one was wrong (then
+   update the file, with why). Settle each open question marked as
+   blocking `/scenario` now, or have the user defer it explicitly, and
+   update the file either way. If there is more than one design file,
+   ask which slice this is. Otherwise, if `docs/backlog.md` exists, show
+   its entries: AT candidates earlier slices discovered. The user may
+   pick one as this slice, or start something new. Unsettled ground
+   (naming, test environment, where things live) that stalls the
+   behaviour talk is a sign to stop and run `/design` first.
 1. **Behaviour in one sentence**, in business language. Push back on
    technical framing ("insert row" → "customer places an order").
 2. **Ubiquitous language check** — do the nouns/verbs match the domain
@@ -37,7 +51,8 @@ term the glossary doesn't settle.
 3. **Entry point** and **observable outcome** — externally visible only.
 4. **One meaningful sad path** to cover alongside the happy path.
 5. **Clean architecture boundary** — which layer does the AT enter through?
-   (Application layer preferred; UI entry only for smoke tests.)
+   (Application layer preferred; UI entry only for smoke tests.) Take
+   boundaries and the test environment from the design notes, if any.
 6. **Outer net kind.** `dsl` (the default) is the DSL acceptance test
    above. Propose `contract` when the slice adds an adapter behind a port
    that already exists (a Kubernetes `RunStore` next to the in-memory
@@ -97,7 +112,8 @@ term the glossary doesn't settle.
    `cycle: 0` and an empty collaborator list. It refuses to overwrite an
    existing file; archive a finished slice first (precondition 1).
 7. Commit on feature/<slice>-tmp: `test: failing acceptance test — <slice>`
-   (a `contract` net's stub goes in this commit too)
+   (a `contract` net's stub goes in this commit too, and so does
+   `.bdd/design-<slice>.md` if `/design` wrote one)
    (if the slice came from `docs/backlog.md`, remove that entry in the
    same commit).
 8. Announce: `🔴 AT: <behaviour>` and tell the user the next command is

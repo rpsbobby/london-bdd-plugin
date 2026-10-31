@@ -12,6 +12,7 @@ Humble & Farley (CD).
 
 ```
 GREENFIELD                          EXISTING CODE (SAFE / FULL_REFACTOR)
+(/london-bdd:design — optional)
 /london-bdd:scenario                /london-bdd:refactor-scope (declares net)
 /london-bdd:decompose               /london-bdd:characterise (only if net gap)
 /london-bdd:inner  (×N)             (/london-bdd:decompose)
@@ -33,8 +34,14 @@ All commands live under the `/london-bdd:` prefix.
 
 | Command | Use when | What it does |
 |---|---|---|
-| `/london-bdd:scenario` | Starting **new** behaviour (greenfield) | Conversation first: agree ubiquitous language, write the Gherkin scenario and the failing acceptance test — the outer red. |
+| `/london-bdd:scenario` | Starting **new** behaviour (greenfield) | Conversation first: agree ubiquitous language, write the Gherkin scenario and the failing acceptance test — the outer red. Starts from `/design`'s notes when there are any. |
 | `/london-bdd:refactor-scope` | Refactoring **existing** code, tested or not | Declares the blast radius (what/in/out/seams, SAFE or FULL_REFACTOR mode) and the net: existing trusted suites (verified green — /characterise skipped) or a characterisation net to build. Scope only — never solution design. |
+
+**Before a slice** — optional:
+
+| Command | Use when | What it does |
+|---|---|---|
+| `/london-bdd:design` | A greenfield slice needs decisions before its behaviour can be stated (naming, test environment, where things live) | Talks the options through and records decisions and open questions in `.bdd/design-<slice>.md`. No code, tests or Gherkin. `/scenario` reads it first and commits it with the slice; durable decisions go to `/adr`. |
 
 **The loop** — run in order once a slice is open:
 

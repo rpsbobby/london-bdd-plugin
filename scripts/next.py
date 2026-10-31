@@ -16,8 +16,8 @@ import guard  # noqa: E402
 
 def compute(s):
     if s is None:
-        return ("/scenario (greenfield) or /refactor-scope (legacy)",
-                 "no active slice")
+        return ("/scenario (greenfield, optionally /design first) or "
+                "/refactor-scope (legacy)", "no active slice")
 
     phase = s["phase"]
     slice_name = s["slice"] or "?"

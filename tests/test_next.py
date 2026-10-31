@@ -24,6 +24,12 @@ def test_no_session_suggests_slice_entry_points(tmp_path):
     assert "/refactor-scope" in out
 
 
+def test_no_session_offers_design_as_optional_first_step(tmp_path):
+    init_repo(tmp_path)
+    out = run_next(tmp_path)
+    assert "optionally /design first" in out
+
+
 def test_phase_characterise_suggests_characterise(tmp_path):
     init_repo(tmp_path)
     open_slice(tmp_path, "x", phase="characterise", mode="SAFE")

@@ -201,4 +201,7 @@ session.yml can carry state across that checkout. See `/commit-merge` and
   not a judgment call. Run `/status` (`scripts/next.py`), which parses
   this file the same way the guard hook does.
 - One slice per session file. New slice = archive old file to
-  `.bdd/archive/<slice>.yml`, create fresh.
+  `.bdd/archive/<slice>.yml` (and its `.bdd/design-<slice>.md`, if
+  `/design` wrote one, to `.bdd/archive/design-<slice>.md`), create
+  fresh. `/design` never writes session.yml: its notes are a separate
+  file that exists before the slice does.
