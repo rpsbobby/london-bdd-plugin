@@ -407,6 +407,65 @@ def test_allows_inner_greenfield_with_queue_and_red_at(repo):
     assert code == 0
 
 
+def session_edit(repo, tool_input):
+    """Run the guard on an arbitrary Write/Edit/MultiEdit of session.yml."""
+    tool_input = {"file_path": str(repo / ".bdd" / "session.yml"),
+                  **tool_input}
+    payload = json.dumps({"tool_input": tool_input, "cwd": str(repo)})
+    proc = subprocess.run(
+        [sys.executable, str(GUARD), "edit"], input=payload,
+        capture_output=True, text=True)
+    return proc.returncode, proc.stderr
+
+
+MAP = ("collaborators:\n  - role: A\n    status: pending\n"
+       "tests:\n  - name: should_a\n    collaborator: A"
+       "\n    origin: planned\n    status: pending\n")
+
+
+def test_allows_one_write_that_records_the_map_and_enters_inner(repo):
+    """/decompose records the map and moves to inner in one write: the
+    preconditions are checked against what the write leaves on disk."""
+    open_slice(repo, "x", phase="decompose", mode="GREENFIELD",
+               **{"acceptance_test": "\n  status: red"})
+    content = (repo / ".bdd" / "session.yml").read_text().replace(
+        "phase: decompose", "phase: inner") + MAP
+    code, err = session_edit(repo, {"content": content})
+    assert code == 0, err
+
+
+def test_allows_one_multiedit_that_records_the_map_and_enters_inner(repo):
+    open_slice(repo, "x", phase="decompose", mode="GREENFIELD",
+               **{"acceptance_test": "\n  status: red"})
+    code, err = session_edit(repo, {"edits": [
+        {"old_string": "phase: decompose", "new_string": "phase: inner"},
+        {"old_string": "  status: red\n",
+         "new_string": "  status: red\n" + MAP},
+    ]})
+    assert code == 0, err
+
+
+def test_blocks_one_write_entering_inner_that_records_no_tests(repo):
+    open_slice(repo, "x", phase="decompose", mode="GREENFIELD",
+               **{"acceptance_test": "\n  status: red"})
+    content = (repo / ".bdd" / "session.yml").read_text().replace(
+        "phase: decompose", "phase: inner")
+    code, err = session_edit(repo, {"content": content})
+    assert code == 2
+    assert "Rule D" in err
+
+
+def test_one_write_cannot_move_backward_by_rewriting_the_phase(repo):
+    """The phase moved FROM still comes from disk, not from the write."""
+    open_slice(repo, "x", phase="close", mode="GREENFIELD",
+               **{"collaborators": "\n  - role: A\n    status: done"})
+    content = (repo / ".bdd" / "session.yml").read_text().replace(
+        "phase: close", "phase: decompose")
+    code, err = session_edit(repo, {"content": content})
+    assert code == 2
+    assert "Rule D" in err
+
+
 def test_blocks_inner_safe_without_green_characterisation(repo):
     open_slice(repo, "x", phase="characterise", mode="SAFE")
     code, err = edit_session(repo, "inner")

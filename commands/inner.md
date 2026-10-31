@@ -68,7 +68,11 @@ them and does not discover. Review its diff as in step 2 (findings only,
 no proposals), then continue below.
 
 No open tests → set `phase: close` (the guard checks every test is
-`done`). Tell the user the next command is `/review`.
+`done`), and leave that change uncommitted. From `close` on, the
+acceptance test is part of every commit's checks, and it stays red
+until `/review` wires the composition root, so a commit holding only
+the phase change is refused. `/review`'s wiring commit carries it. Tell
+the user the next command is `/review`.
 
 ## Granular mode (`inner: granular`)
 

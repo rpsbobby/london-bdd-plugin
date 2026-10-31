@@ -13,7 +13,10 @@ on feature/<slice>-tmp.
 ## Steps
 
 1. **Wire the composition root.** Real implementations composed at the
-   boundary; no test doubles leak into production wiring.
+   boundary; no test doubles leak into production wiring. `/inner` left
+   the move to `phase: close` uncommitted, because the red acceptance
+   test blocks any commit before this wiring; commit it together with
+   the wiring once step 2 shows the outer net green.
 2. **Run the outer net.**
    - GREENFIELD: acceptance test → expect `🟢 AT`. A `contract` net is
      green only when every subject in `acceptance_test.subjects` passes. Still red → treat as a

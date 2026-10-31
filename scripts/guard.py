@@ -80,6 +80,15 @@ def find_session(start):
 
 def parse_session(path):
     """Minimal YAML subset parser — avoids a PyYAML dependency."""
+    try:
+        text = open(path, encoding="utf-8").read()
+    except OSError:
+        text = ""
+    return parse_session_text(text)
+
+
+def parse_session_text(text):
+    """parse_session on a string: the file as an edit would leave it."""
     s = {"slice": None, "mode": None, "branch": None, "base_branch": None,
          "current_failing_test": None, "scope_in": [], "scope_out": [],
          "phase": None, "char_status": None, "net_status": None,
@@ -87,10 +96,6 @@ def parse_session(path):
          "collaborators": [], "tests": [], "cycle": 0,
          "checks_tests": None, "acceptance_file": None,
          "acceptance_name": None, "net_suites": []}
-    try:
-        text = open(path, encoding="utf-8").read()
-    except OSError:
-        return s
     m = re.search(r"^slice:\s*(\S+)", text, re.M)
     if m: s["slice"] = m.group(1)
     m = re.search(r"^mode:\s*(\S+)", text, re.M)
@@ -202,6 +207,29 @@ def extract_new_phase(tool_input):
     text = "\n".join(chunks)
     m = re.search(r"^phase:\s*(\S+)", text, re.M)
     return m.group(1) if m else None
+
+
+def session_after_edit(session_path, tool_input):
+    """The text session.yml would hold once this Write/Edit/MultiEdit
+    lands, so Rule D checks the preconditions of the phase it enters
+    against the edit's own result: /decompose can record the map and move
+    to inner in one write. An old_string that isn't there leaves the text
+    unchanged; the tool call fails anyway."""
+    if "content" in tool_input:
+        return tool_input["content"]
+    try:
+        text = open(session_path, encoding="utf-8").read()
+    except OSError:
+        text = ""
+    edits = list(tool_input.get("edits") or [])
+    if "old_string" in tool_input:
+        edits.insert(0, tool_input)
+    for e in edits:
+        old, new = e.get("old_string", ""), e.get("new_string", "")
+        if old and old in text:
+            text = (text.replace(old, new) if e.get("replace_all")
+                    else text.replace(old, new, 1))
+    return text
 
 
 def validate_phase_transition(s, new_phase):
@@ -629,7 +657,12 @@ def main():
     if r.replace(os.sep, "/") == ".bdd/session.yml":
         new_phase = extract_new_phase(tool_input)
         if new_phase and new_phase != s["phase"]:
-            err = validate_phase_transition(s, new_phase)
+            # Preconditions from the edit's result; the phase it moves
+            # from stays the one on disk.
+            after = parse_session_text(
+                session_after_edit(session_path, tool_input))
+            after["phase"] = s["phase"]
+            err = validate_phase_transition(after, new_phase)
             if err:
                 block(err)
 
