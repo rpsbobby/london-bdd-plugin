@@ -159,15 +159,24 @@ for "if it works, it should speak for itself."
 Commands and
 `SKILL.md` edits apply immediately; changes to hooks or agents need
 `/reload-plugins`. If skills don't appear after install, clear the cache
-(`rm -rf ~/.claude/plugins/cache`), restart, reinstall. To pick up a
-new release, run `/plugin marketplace update london-bdd-marketplace`,
-then `/reload-plugins`.
+(`rm -rf ~/.claude/plugins/cache`), restart, reinstall.
+
+**Updating:** auto-update is off by default for third-party marketplaces,
+so pull a new release yourself, from your shell:
+```
+claude plugin marketplace update london-bdd-marketplace
+claude plugin update london-bdd@london-bdd-marketplace
+```
+The first refreshes the catalog, the second installs the new version.
+It loads in your next session, or run `/reload-plugins` in a running
+one. To get releases automatically instead, turn on **Enable
+auto-update** for the marketplace under `/plugin` → **Marketplaces**.
 
 ## Releasing
 
 Claude Code installs by `version` in `.claude-plugin/plugin.json`: while
-it stays the same, installed copies don't update, whatever lands on
-`main`. So bump it when a change should reach users: minor for a new
+it stays the same, `claude plugin update` and auto-update keep users on
+their cached copy, whatever lands on `main`. So bump it when a change should reach users: minor for a new
 command or rule, patch for a fix. If you ever pin versions in the
 `marketplace.json` entry, bump it there too. The repo must stay
 **public**, since Claude Code fetches marketplaces straight from GitHub.
