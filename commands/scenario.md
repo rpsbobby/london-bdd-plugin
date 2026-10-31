@@ -59,10 +59,18 @@ Work through these WITH the user, one at a time:
    `checks.tests`. If the repo has a `.pre-commit-config.yaml`, check
    its hook is installed (`pre-commit install` if not): the guard blocks
    commits otherwise.
-6. Create `.bdd/session.yml`:
-   `mode: GREENFIELD`, `phase: decompose`, `acceptance_test.status: red`
-   with its `file`, `inner` from step 4, `checks` from step 5, branch
-   fields set, empty collaborator list.
+6. Create `.bdd/session.yml` with the helper, from the answers above (do
+   not hand-write it; it validates the result with the guard's parser):
+   ```
+   python3 ${CLAUDE_PLUGIN_ROOT}/scripts/session.py init \
+     --slice <slice> --mode GREENFIELD --inner <batch|granular> \
+     --checks-tests "<checks command>" \
+     --acceptance-file <test file> --acceptance-name "<test name>"
+   ```
+   This writes `phase: decompose`, `acceptance_test.status: red`, the
+   branch fields (`feature/<slice>-tmp`, base `feature/<slice>-main`),
+   `cycle: 0` and an empty collaborator list. It refuses to overwrite an
+   existing file; archive a finished slice first (precondition 1).
 7. Commit on feature/<slice>-tmp: `test: failing acceptance test — <slice>`
    (if the slice came from `docs/backlog.md`, remove that entry in the
    same commit).

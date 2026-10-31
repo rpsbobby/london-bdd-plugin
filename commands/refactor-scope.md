@@ -56,9 +56,15 @@ skill and `references/scope-template.md`.
    `.pre-commit-config.yaml`, check its hook is installed.
 7. Create branches (`feature/<slice>-main`, `feature/<slice>-tmp`), check
    out feature/<slice>-tmp.
-8. Write `.bdd/session.yml` with `mode`, the scope block, branch fields,
-   the `net:` block, `inner` from step 5, `checks` from step 6, and the
-   phase the net decision earned:
+8. Write `.bdd/session.yml` with
+   `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/session.py init --slice <slice>
+   --mode <SAFE|FULL_REFACTOR> --inner <i> --checks-tests "<cmd>"
+   --scope-in <glob>... [--scope-out <glob>...] --net-kind
+   <existing|characterisation> [--net-suite <path>...]` (FULL_REFACTOR
+   also takes `--acceptance-file`/`--acceptance-name`). It writes `mode`,
+   the scope block, branch fields, the `net:` block, `inner`, `checks`,
+   and defaults `phase` to what the net decision earned (override with
+   `--phase`):
    - net still to build → `phase: characterise`
    - net existing + green → `phase: inner` (SAFE) or `phase: decompose`
      (FULL_REFACTOR)

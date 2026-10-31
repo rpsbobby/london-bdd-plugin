@@ -250,3 +250,105 @@ def test_guard_still_blocks_redirect_to_session_yml(tmp_path):
     code, err = guard(tmp_path, "bash",
                       command="python3 s.py init > .bdd/session.yml")
     assert code == 2 and "Rule D" in err
+
+
+# ---- init -------------------------------------------------------------
+
+def init_args(tmp_path, *extra):
+    return ["init", "--slice", "place-order", "--mode", "GREENFIELD",
+            "--checks-tests", "uv run pytest {files}",
+            "--acceptance-file", "tests/acceptance/place_order_test.py",
+            "--acceptance-name", "PlaceOrder.ReturnsId",
+            "--file", tmp_path / ".bdd" / "session.yml", *extra]
+
+
+def test_init_writes_file_that_validates_and_guard_reads_back(tmp_path):
+    code, _, err = run(*init_args(tmp_path))
+    assert code == 0, err
+    p = tmp_path / ".bdd" / "session.yml"
+    assert run("validate", p)[0] == 0
+    s = guard_mod.parse_session(str(p))
+    assert (s["slice"], s["mode"], s["phase"], s["inner"]) == (
+        "place-order", "GREENFIELD", "decompose", "batch")
+    assert s["branch"] == "feature/place-order-tmp"
+    assert s["base_branch"] == "feature/place-order-main"
+    assert s["cycle"] == 0 and s["acceptance_status"] == "red"
+    assert s["checks_tests"] == "uv run pytest {files}"
+    assert s["acceptance_file"] == "tests/acceptance/place_order_test.py"
+    assert s["acceptance_name"] == "PlaceOrder.ReturnsId"
+    assert s["collaborators"] == [] and s["tests"] == []
+
+
+def test_init_honours_options(tmp_path):
+    code, _, _ = run(*init_args(tmp_path, "--inner", "granular",
+                                "--base-branch", "feature/other-main",
+                                "--phase", "scenario"))
+    assert code == 0
+    s = guard_mod.parse_session(str(tmp_path / ".bdd" / "session.yml"))
+    assert (s["inner"], s["base_branch"], s["phase"]) == (
+        "granular", "feature/other-main", "scenario")
+
+
+def test_init_refuses_overwrite_without_force(tmp_path):
+    assert run(*init_args(tmp_path))[0] == 0
+    p = tmp_path / ".bdd" / "session.yml"
+    before = p.read_text()
+    code, _, err = run(*init_args(tmp_path))
+    assert code != 0 and "exists" in err and p.read_text() == before
+
+
+def test_init_force_cannot_rewind_an_active_slice(tmp_path):
+    assert run(*init_args(tmp_path))[0] == 0
+    p = tmp_path / ".bdd" / "session.yml"
+    code, _, err = run(*init_args(tmp_path, "--force"))
+    assert code != 0 and "active slice" in err
+    p.write_text(p.read_text().replace("phase: decompose", "phase: done"))
+    assert run(*init_args(tmp_path, "--force"))[0] == 0
+    assert guard_mod.parse_session(str(p))["phase"] == "decompose"
+
+
+def test_init_rejects_bad_input(tmp_path):
+    assert run(*init_args(tmp_path, "--inner", "wild"))[0] != 0
+    assert run("init", "--slice", "Bad Name", "--mode", "GREENFIELD",
+               "--checks-tests", "x", "--acceptance-file", "a",
+               "--acceptance-name", "b", "--file", tmp_path / "s.yml")[0] != 0
+    # GREENFIELD needs the acceptance test
+    assert run("init", "--slice", "x", "--mode", "GREENFIELD",
+               "--checks-tests", "x", "--file", tmp_path / "s.yml")[0] != 0
+    assert not (tmp_path / "s.yml").exists()
+
+
+def test_init_safe_with_existing_net(tmp_path):
+    p = tmp_path / "s.yml"
+    code, _, err = run("init", "--slice", "pricing", "--mode", "SAFE",
+                       "--checks-tests", "pytest", "--net-kind", "existing",
+                       "--net-suite", "tests/pricing/",
+                       "--scope-in", "src/pricing/*.py",
+                       "--scope-out", "src/pricing/tax.py", "--file", p)
+    assert code == 0, err
+    s = guard_mod.parse_session(str(p))
+    assert (s["phase"], s["net_kind"], s["net_status"]) == (
+        "inner", "existing", "green")
+    assert s["scope_in"] == ["src/pricing/*.py"]
+    assert s["scope_out"] == ["src/pricing/tax.py"]
+    assert s["net_suites"] == ["tests/pricing/"]
+
+
+def test_init_safe_new_net_starts_in_characterise(tmp_path):
+    p = tmp_path / "s.yml"
+    assert run("init", "--slice", "pricing", "--mode", "SAFE",
+               "--checks-tests", "pytest", "--net-kind", "characterisation",
+               "--scope-in", "src/p.py", "--file", p)[0] == 0
+    s = guard_mod.parse_session(str(p))
+    assert (s["phase"], s["net_status"]) == ("characterise", "red")
+
+
+def test_init_quotes_values_the_guard_reads_back_verbatim(tmp_path):
+    p = tmp_path / "s.yml"
+    assert run("init", "--slice", "x", "--mode", "GREENFIELD",
+               "--checks-tests", "go test -skip ^{outer_net}$ ./pkg/...",
+               "--acceptance-file", "a_test.go",
+               "--acceptance-name", "TestX: does y # z", "--file", p)[0] == 0
+    s = guard_mod.parse_session(str(p))
+    assert s["checks_tests"] == "go test -skip ^{outer_net}$ ./pkg/..."
+    assert s["acceptance_name"] == "TestX: does y # z"

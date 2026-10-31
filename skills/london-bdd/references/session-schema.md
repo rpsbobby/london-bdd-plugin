@@ -8,6 +8,13 @@ the slice), but excluded from the squash onto `feature/<slice>-main`.
 If the file is missing, no slice is active — only `/scenario` or
 `/refactor-scope` may create it.
 
+`scripts/session.py` is the preferred writer: `init` creates the file for a
+new slice, `validate` checks one (required keys, enums, collaborator and
+test shape, using the guard's parser), and the builder's bookkeeping goes
+through `set-test`, `set-collaborator`, `set-failing-test`, `commit-cycle`
+and `set-discovery-rounds`. It never changes `phase` after `init`: phase
+moves stay Edit/Write calls so Rule D checks them.
+
 ## Schema
 
 ```yaml

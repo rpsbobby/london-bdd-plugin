@@ -13,6 +13,11 @@ left untouched. `phase:` is never changed here — phase moves stay an
 Edit/Write call so guard Rule D (validate_phase_transition) checks them.
 
 Usage:
+  session.py init --slice S --mode M --checks-tests CMD
+                  [--inner batch|granular] [--phase P] [--base-branch B]
+                  [--acceptance-file F --acceptance-name N]
+                  [--scope-in G]... [--scope-out G]...
+                  [--net-kind K --net-suite P... --net-status S] [--force]
   session.py validate [path]
   session.py set-test NAME --status S [--file F]
   session.py set-collaborator ROLE --status S [--file F]
@@ -292,6 +297,103 @@ def cmd_set_discovery_rounds(args):
         t, "discovery_rounds", f"discovery_rounds: {args.n}"))
 
 
+def yaml_scalar(value, what):
+    """A value the guard's regex parser reads back unchanged."""
+    if not value or "\n" in value:
+        raise ValueError(f"{what} must be a non-empty single line")
+    if (re.search(r"(^[\s\-?:,\[\]{}#&*!|>'\"%@`])|(: )| #|\s$", value)):
+        for q in ('"', "'"):
+            if q not in value and "\\" not in value:
+                return q + value + q
+        raise ValueError(f"{what} has characters that can't be quoted "
+                         "safely; simplify it")
+    return value
+
+
+def default_phase(mode, net_kind):
+    if mode == "GREENFIELD":
+        return "decompose"
+    if net_kind == "existing":
+        return "inner" if mode == "SAFE" else "decompose"
+    return "characterise"
+
+
+def render_init(a):
+    check_enum(a.mode, MODES, "mode")
+    check_enum(a.inner, INNER, "inner")
+    if not re.fullmatch(r"[a-z0-9]+(-[a-z0-9]+)*", a.slice):
+        raise ValueError(f"slice '{a.slice}' must be kebab-case")
+    if a.net_kind is not None:
+        check_enum(a.net_kind, ("existing", "characterisation"), "net kind")
+    if a.net_status is not None:
+        check_enum(a.net_status, NET_STATUS, "net status")
+    phase = a.phase or default_phase(a.mode, a.net_kind)
+    check_enum(phase, PHASES, "phase")
+    if a.mode != "SAFE" and not (a.acceptance_file and a.acceptance_name):
+        raise ValueError(f"{a.mode} needs --acceptance-file and "
+                         "--acceptance-name")
+    if bool(a.acceptance_file) != bool(a.acceptance_name):
+        raise ValueError("--acceptance-file and --acceptance-name go "
+                         "together")
+    if a.mode != "GREENFIELD" and not a.net_kind:
+        raise ValueError(f"{a.mode} needs --net-kind (existing | "
+                         "characterisation)")
+    if a.mode != "GREENFIELD" and not a.scope_in:
+        raise ValueError(f"{a.mode} needs at least one --scope-in")
+    out = [f"slice: {a.slice}", f"mode: {a.mode}", f"phase: {phase}",
+           f"inner: {a.inner}", "checks:",
+           f"  tests: {yaml_scalar(a.checks_tests, 'checks-tests')}",
+           f"branch: feature/{a.slice}-tmp",
+           f"base_branch: {a.base_branch or f'feature/{a.slice}-main'}"]
+    if a.acceptance_file:
+        out += ["acceptance_test:",
+                f"  file: {yaml_scalar(a.acceptance_file, 'acceptance-file')}",
+                f"  name: {yaml_scalar(a.acceptance_name, 'acceptance-name')}",
+                "  status: red"]
+    if a.net_kind:
+        out += ["net:", f"  kind: {a.net_kind}", "  suites:"]
+        out += [f"    - {yaml_scalar(x, 'net-suite')}" for x in a.net_suite]
+        if not a.net_suite:
+            out[-1] = "  suites: []"
+        out += [f"  status: {a.net_status or ('green' if a.net_kind == 'existing' else 'red')}"]
+    if a.mode != "GREENFIELD":
+        out += ["scope:", "  in:"]
+        out += [f"    - {yaml_scalar(x, 'scope-in')}" for x in a.scope_in]
+        if a.scope_out:
+            out += ["  out:"]
+            out += [f"    - {yaml_scalar(x, 'scope-out')}"
+                    for x in a.scope_out]
+    out += ["collaborators: []", "tests: []", "discovery_rounds: 0",
+            "cycle: 0"]
+    return "\n".join(out) + "\n"
+
+
+def cmd_init(a):
+    path = locate(a.file) if a.file else os.path.join(".bdd", "session.yml")
+    if os.path.exists(path):
+        if not a.force:
+            print(f"error: {path} exists; archive it to .bdd/archive/ or "
+                  "pass --force", file=sys.stderr)
+            return 1
+        # --force must not rewind an active slice's phase behind Rule D
+        old = top_value(read(path), "phase")
+        if old in PHASES and old != "done":
+            print(f"error: {path} is an active slice (phase: {old}); "
+                  "archive it first — --force only replaces a finished or "
+                  "unreadable file", file=sys.stderr)
+            return 1
+    try:
+        text = render_init(a)
+    except ValueError as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 1
+    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+    code = write_checked(path, text)
+    if not code:
+        print(f"wrote {path}")
+    return code
+
+
 def build_parser():
     p = argparse.ArgumentParser(prog="session.py", description=__doc__,
                                 formatter_class=argparse.RawTextHelpFormatter)
@@ -305,6 +407,22 @@ def build_parser():
                             "nearest .bdd/session.yml)")
         return sp
 
+    sp = add("init", cmd_init, help="write a fresh session.yml for a slice")
+    sp.set_defaults(file=None)
+    sp.add_argument("--slice", required=True)
+    sp.add_argument("--mode", required=True)
+    sp.add_argument("--inner", default="batch")
+    sp.add_argument("--checks-tests", required=True)
+    sp.add_argument("--acceptance-file")
+    sp.add_argument("--acceptance-name")
+    sp.add_argument("--base-branch")
+    sp.add_argument("--phase")
+    sp.add_argument("--scope-in", action="append", default=[])
+    sp.add_argument("--scope-out", action="append", default=[])
+    sp.add_argument("--net-kind")
+    sp.add_argument("--net-suite", action="append", default=[])
+    sp.add_argument("--net-status")
+    sp.add_argument("--force", action="store_true")
     v = add("validate", cmd_validate, help="check an existing session.yml")
     v.add_argument("path", nargs="?")
     sp = add("set-test", cmd_set_test, help="set a test's status")
