@@ -5,7 +5,8 @@ description: Break the slice into collaborators and the tests that drive each on
 
 # /decompose — Discover Collaborators, Plan the Tests
 
-Read the `london-bdd` skill and `references/collaborator-discovery.md`.
+Read the `london-bdd` skill, `references/collaborator-discovery.md`, and
+`references/decompose-map-template.md`.
 
 ## Preconditions
 
@@ -26,8 +27,12 @@ Read the `london-bdd` skill and `references/collaborator-discovery.md`.
    discovery at the end of the inner loop exists for that.
 4. Sanity checks (from the skill): >3–4 collaborators on one class →
    challenge; chain deeper than 3 levels → slice thinner.
-5. **Present the whole map at once: roles, interfaces, tests. The user
-   approves or edits it as one unit.** Names are design decisions, so
+5. **Present the whole map as one message, in the shape of
+   `references/decompose-map-template.md`:** entry point, roles table
+   (role, kind, interface, doubled or kept real), tests in build order
+   grouped by role, how the outer net turns green, things to settle with
+   the sanity check result, and a closing "approve, or edit?". The user
+   approves or edits it as one unit. Names are design decisions, so
    nothing is recorded until they approve. One approval, not one per
    role.
 6. Write to session.yml: `collaborators:` ordered outside-in, all

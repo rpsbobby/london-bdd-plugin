@@ -252,6 +252,8 @@ commands check first anyway — commands are polite, hooks are absolute.
 - `references/approval-testing.md` — golden-master/approval testing and
   which library to reach for per language
 - `references/collaborator-discovery.md` — role heuristics and naming
+- `references/decompose-map-template.md` — the shape of the map /decompose
+  presents for approval
 - `references/test-discovery.md` — what discovery looks for, UT vs AT
   sizing, the proposal format, and how approved proposals are recorded
 - `references/language-notes.md` — general per-language tooling
