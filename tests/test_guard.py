@@ -301,6 +301,33 @@ def test_blocks_close_with_no_collaborators(repo):
     assert "Rule D" in err
 
 
+def test_allows_close_safe_with_green_existing_net_and_nothing_to_build(repo):
+    """Tidy-only slice: the existing green net is the license, no tests or
+    collaborators are ever recorded."""
+    open_slice(repo, "x", phase="inner", mode="SAFE",
+               **{"net": "\n  kind: existing\n  status: green"})
+    code, _ = edit_session(repo, "close")
+    assert code == 0
+
+
+def test_blocks_close_safe_with_characterisation_net_and_no_collaborators(repo):
+    open_slice(repo, "x", phase="inner", mode="SAFE",
+               **{"net": "\n  kind: characterisation\n  status: green"})
+    code, err = edit_session(repo, "close")
+    assert code == 2
+    assert "Rule D" in err
+
+
+def test_blocks_close_safe_existing_net_with_open_test(repo):
+    open_slice(repo, "x", phase="inner", mode="SAFE",
+               **{"net": "\n  kind: existing\n  status: green",
+                  "tests": "\n  - name: should_a\n    origin: planned"
+                           "\n    status: pending"})
+    code, err = edit_session(repo, "close")
+    assert code == 2
+    assert "Rule D" in err
+
+
 def test_allows_close_when_all_collaborators_done(repo):
     open_slice(repo, "x", phase="inner",
                **{"collaborators": "\n  - role: A\n    status: done"})

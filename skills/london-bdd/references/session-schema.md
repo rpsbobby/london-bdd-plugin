@@ -157,7 +157,10 @@ session.yml can carry state across that checkout. See `/commit-merge` and
   validates the target phase on every edit to session.yml — it blocks
   backward moves and moves into a phase whose precondition isn't actually
   met yet (e.g. `close` requires every collaborator and every test `done`; GREENFIELD `inner` requires a non-empty `tests:` list), so a step
-  can't be skipped by writing the field directly.
+  can't be skipped by writing the field directly. The one exception: a
+  SAFE/FULL_REFACTOR slice with `net.kind: existing`, `net.status: green`
+  and an empty `tests:` list may enter `close` with no collaborators,
+  since it refactors under its green net and builds nothing new.
 - Don't re-derive "what's next" by exploring the repo — it's a lookup,
   not a judgment call. Run `/status` (`scripts/next.py`), which parses
   this file the same way the guard hook does.
