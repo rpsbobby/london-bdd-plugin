@@ -19,7 +19,12 @@ before proceeding.
 
 ## Phase 0 — Discuss (do not skip, do not rush)
 
-Work through these WITH the user, one at a time:
+Work through these WITH the user. Points 0 and 1 are independent
+decisions: settle each one on its own, in order. Points 2–5 hang
+together, so once the behaviour sentence is agreed, propose all four in
+one message for a single confirmation (the user can still edit any of
+them). Split them back out only when one is genuinely open, e.g. a new
+term the glossary doesn't settle.
 
 0. **Backlog first.** If `docs/backlog.md` exists, show its entries:
    AT candidates earlier slices discovered. The user may pick one as this
