@@ -4,6 +4,8 @@ Every command reads this file first and updates it last. It is the single
 source of truth for where we are in the workflow. It lives in the project
 root under `.bdd/` and is committed to `feature/<slice>-tmp` (it documents
 the slice), but excluded from the squash onto `feature/<slice>-main`.
+The slice's design, scope and review notes in `.bdd/` are the exception:
+`/commit-merge` copies them to `docs/slices/<slice>/`.
 
 If the file is missing, no slice is active — only `/scenario` or
 `/refactor-scope` may create it.

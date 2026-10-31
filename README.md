@@ -121,7 +121,9 @@ each running your git hooks and the tests in scope,
 disposable. `feature/<slice>-main`: landed via `/commit-merge` when the
 slice is meaningfully complete — manual by default (you run the squash
 yourself), or `--auto` to let the agent run it, confirmed fresh every
-time. `.bdd/` files stay out of the squash.
+time. `.bdd/` stays out of the squash, except the slice's design,
+scope and review notes, which land in `docs/slices/<slice>/` so they
+outlive the disposable tmp branch.
 
 ## Install
 

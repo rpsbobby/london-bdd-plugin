@@ -26,10 +26,17 @@ Print the summary and:
 ```
 git checkout feature/<slice>-main
 git merge --squash feature/<slice>-tmp
+for n in design scope review; do
+  [ -f .bdd/$n-<slice>.md ] || continue
+  mkdir -p docs/slices/<slice> && cp .bdd/$n-<slice>.md docs/slices/<slice>/$n.md
+done; [ -d docs/slices/<slice> ] && git add docs/slices/<slice>
 git restore --staged .bdd/ 2>/dev/null; rm -rf .bdd/
 git commit -m "<message>"
 ```
-Do not run them. Tell the user this is theirs to run by hand, and that
+The loop keeps the slice's design, scope and review notes in
+`docs/slices/<slice>/` (`design.md`, `scope.md`, `review.md`, whichever
+exist), so they outlive the disposable tmp branch; the rest of `.bdd/`
+stays out. Do not run them. Tell the user this is theirs to run by hand, and that
 `feature/<slice>-tmp` is disposable once merged — delete it whenever.
 
 ## Auto mode (`/commit-merge --auto`)
@@ -54,11 +61,16 @@ reconcile against the target branch's tree.
    ```
 3. `git checkout feature/<slice>-main`
 4. `git merge --squash feature/<slice>-tmp`
-5. Exclude the slice's own bookkeeping from the landed commit — it
-   documents the slice, not the product. All of `.bdd/` stays out, as in
-   manual mode (session.yml, design and scope notes, the archive), except
-   the untracked marker, which the next step still needs:
+5. Keep the slice's notes, drop its bookkeeping. The design, scope and
+   review notes are copied to `docs/slices/<slice>/` and land with the
+   slice, since `feature/<slice>-tmp` is disposable. The rest of `.bdd/`
+   (session.yml, the archive) stays out, as in manual mode, except the
+   untracked marker, which the next step still needs:
    ```
+   for n in design scope review; do
+     [ -f .bdd/$n-<slice>.md ] || continue
+     mkdir -p docs/slices/<slice> && cp .bdd/$n-<slice>.md docs/slices/<slice>/$n.md
+   done; [ -d docs/slices/<slice> ] && git add docs/slices/<slice>
    git restore --staged .bdd/ 2>/dev/null; find .bdd -mindepth 1 ! -name .merge-authorized -delete
    ```
 6. `git commit -m "<message>"`

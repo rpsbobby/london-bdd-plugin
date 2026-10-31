@@ -52,8 +52,9 @@ ground. Read the `london-bdd` skill and `references/design-template.md`.
    whether it blocks `/scenario`).
 5. **ADR check.** A decision that will outlive the slice (a naming
    scheme, a test environment the whole repo will use) belongs in an ADR
-   too: `.bdd/` stays out of the squash onto `feature/<slice>-main`, so
-   the design file never reaches it. Offer `/adr` for each one and note
+   too. The design file does land with the slice, as
+   `docs/slices/<slice>/design.md`, but as that slice's record: nobody
+   looks there for a repo-wide rule. Offer `/adr` for each one and note
    the ADR number in the decision. Slice-only decisions stay in the file.
 6. **Write `.bdd/design-<slice>.md`** in the template's shape, with
    `Status: agreed` if no blocking question is open, otherwise

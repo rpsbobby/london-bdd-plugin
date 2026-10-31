@@ -4,9 +4,10 @@ Written by `/design` to `.bdd/design-<slice>.md`, before `/scenario`.
 Decisions and open questions around the slice, never the design inside
 it: no collaborators, roles or interfaces (those are `/decompose`'s).
 The file is untracked until `/scenario` commits it on
-`feature/<slice>-tmp`; like everything in `.bdd/`, it stays out of the
-squash onto `feature/<slice>-main` and moves to `.bdd/archive/` with the
-slice. Decisions that must outlive the slice go to an ADR as well.
+`feature/<slice>-tmp`. `/commit-merge` copies it to
+`docs/slices/<slice>/design.md` in the landing commit on
+`feature/<slice>-main`, so it outlives the disposable tmp branch.
+Decisions that must outlive the slice go to an ADR as well.
 
 ```markdown
 # Design — <slice name>
