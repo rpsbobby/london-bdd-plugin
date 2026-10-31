@@ -451,8 +451,8 @@ def run_tests_in_scope(s, root):
     tpl = s["checks_tests"]
     # {outer_net}: the acceptance test's name until phase close (it is red on
     # purpose), empty from close on. Shell-quoted like {files}, so write it
-    # unquoted: `go test -skip {outer_net} ...`. Empty becomes '', which
-    # `go test -skip` reads as "skip nothing".
+    # unquoted and anchored: `go test -skip ^{outer_net}$ ...`. Empty then
+    # becomes ^$, which skips nothing.
     outer = "" if s["phase"] in ("close", "done") else s["acceptance_name"] or ""
     subs = {"{files}": args, "{outer_net}": shlex.quote(outer)}
     cmd = re.sub(r"\{files\}|\{outer_net\}", lambda m: subs[m.group(0)], tpl)

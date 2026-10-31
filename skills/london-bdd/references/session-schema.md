@@ -126,9 +126,9 @@ session.yml can carry state across that checkout. See `/commit-merge` and
   write it unquoted) before phase `close` and with an empty string from
   `close` on, or when no name is recorded. For runners that scope by
   package (Go), it keeps the red outer net out of the inner commits:
-  `go test -skip {outer_net} ./pkg/...`. The empty `''` is fine for
-  `go test -skip` (skips nothing). The name is passed as-is, so for
-  `-skip` it is a regexp.
+  `go test -skip ^{outer_net}$ ./pkg/...`. `-skip` takes a regexp, so
+  anchor it, or `TestFoo` also skips `TestFooBar`; from `close` on it
+  becomes `^$`, which skips nothing.
 - `tests` is the build list. `/decompose` writes it (`origin: planned`)
   after the human approves the whole map. Approved discovery proposals
   are appended (`origin: discovered`), as are behaviour findings accepted
