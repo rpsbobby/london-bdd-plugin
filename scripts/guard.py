@@ -208,11 +208,24 @@ def validate_phase_transition(s, new_phase):
     old_phase = s["phase"]
     if new_phase not in PHASE_ORDER:
         return None
+    review_reentry = False
     if old_phase in PHASE_ORDER and (
             PHASE_ORDER.index(new_phase) < PHASE_ORDER.index(old_phase)):
-        return (f"Rule D: phase cannot move backward from '{old_phase}' to "
-                f"'{new_phase}'. Phase transitions are forward-only within "
-                "a slice (session-schema.md).")
+        # The one backward move: /review accepted a behaviour finding and
+        # recorded a failing-test-first entry for it (origin: review).
+        open_review = [t for t in s["tests"] if t["origin"] == "review"
+                       and t["status"] != "done"]
+        if (old_phase, new_phase) == ("close", "inner") and open_review:
+            review_reentry = True
+        elif (old_phase, new_phase) == ("close", "inner"):
+            return ("Rule D: cannot move from 'close' back to 'inner' "
+                    "without an open test with origin: review. /review "
+                    "records one per accepted behaviour finding first.")
+        else:
+            return (f"Rule D: phase cannot move backward from "
+                    f"'{old_phase}' to '{new_phase}'. Phase transitions "
+                    "are forward-only within a slice (session-schema.md), "
+                    "except close -> inner for review tests.")
 
     if new_phase == "decompose" and s["mode"] in ("SAFE", "FULL_REFACTOR"):
         if net_status(s) != "green":
@@ -228,7 +241,7 @@ def validate_phase_transition(s, new_phase):
                 return ("Rule D: cannot enter phase 'inner' without a "
                         "planned test list — /decompose records the tests "
                         "to build alongside the collaborators.")
-            if s["acceptance_status"] != "red":
+            if s["acceptance_status"] != "red" and not review_reentry:
                 return ("Rule D: cannot enter phase 'inner' — the "
                         "acceptance test must be recorded red first "
                         "(/scenario).")

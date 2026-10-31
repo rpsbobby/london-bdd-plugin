@@ -34,6 +34,24 @@ on feature/<slice>-tmp.
      `.bdd/review-<slice>.md`, then run `agents/reviewer.md`'s checklist
      over the full slice diff for anything that only shows across rounds.
    Present proposals; apply accepted ones; keep everything green.
+   **Triage each finding by whether it changes behaviour.** Refactors,
+   renames and test-support tidy-ups are applied here, under the green
+   net. A finding that changes behaviour (a missing case, a wrong result,
+   an edge such as "check on entry") cannot be fixed here: production
+   edits need a recorded failing test (Rule A), and `close` licenses
+   wiring only. For those, with the user's approval of each:
+   - append a `tests:` entry per finding: `origin: review`,
+     `status: pending`, under the collaborator it belongs to (set that
+     collaborator back to `pending`; add one if the finding exposes a
+     new role);
+   - commit `docs: review findings — <slice>`;
+   - set `phase: inner`. Rule D allows this backward move only from
+     `close` and only while an open `origin: review` test exists;
+   - run `/inner` for them (batch: dispatch the builder with
+     `round: 2`, no discovery; granular: one test per call), then
+     `phase: close` again and resume `/review` at step 1.
+   Review-origin tests don't use a discovery round; the human approved
+   them here.
 4. **AT discovery: one automatic pass.** Run the AT half of
    `references/test-discovery.md` over the finished slice. Every
    candidate is a follow-up: this slice's scope closed at `/inner`. Then

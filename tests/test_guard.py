@@ -285,6 +285,45 @@ def test_blocks_phase_moving_backward(repo):
     assert "Rule D" in err
 
 
+REVIEW_TEST = ("\n  - name: should_check_on_entry\n    collaborator: A"
+               "\n    origin: review\n    status: pending")
+
+
+def test_allows_close_back_to_inner_with_open_review_test(repo):
+    open_slice(repo, "x", phase="close",
+               **{"collaborators": "\n  - role: A\n    status: pending",
+                  "tests": REVIEW_TEST,
+                  "acceptance_test": "\n  status: green"})
+    code, _ = edit_session(repo, "inner")
+    assert code == 0
+
+
+def test_blocks_close_back_to_inner_without_review_test(repo):
+    open_slice(repo, "x", phase="close",
+               **{"collaborators": "\n  - role: A\n    status: done",
+                  "tests": "\n  - name: should_a\n    collaborator: A"
+                           "\n    origin: planned\n    status: pending"})
+    code, err = edit_session(repo, "inner")
+    assert code == 2
+    assert "origin: review" in err
+
+
+def test_blocks_close_back_to_inner_when_review_test_already_done(repo):
+    open_slice(repo, "x", phase="close",
+               **{"collaborators": "\n  - role: A\n    status: done",
+                  "tests": REVIEW_TEST.replace("pending", "done")})
+    code, _ = edit_session(repo, "inner")
+    assert code == 2
+
+
+def test_blocks_done_back_to_inner_even_with_review_test(repo):
+    open_slice(repo, "x", phase="done",
+               **{"collaborators": "\n  - role: A\n    status: pending",
+                  "tests": REVIEW_TEST})
+    code, _ = edit_session(repo, "inner")
+    assert code == 2
+
+
 def test_blocks_close_with_unfinished_collaborator(repo):
     open_slice(repo, "x", phase="inner",
                **{"collaborators": "\n  - role: A\n    status: red"})

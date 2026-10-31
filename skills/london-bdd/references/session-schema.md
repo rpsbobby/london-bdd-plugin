@@ -60,7 +60,7 @@ collaborators:
 tests:                              # the build list, in order — written by
   - name: should_place_order_and_return_id   # /decompose, extended by
     collaborator: OrderService      #   approved discovery proposals
-    origin: planned                 # planned | discovered
+    origin: planned                 # planned | discovered | review
     status: done                    # pending | red | green | done
   - name: should_save_order_and_return_id
     collaborator: OrderRepository
@@ -124,8 +124,9 @@ session.yml can carry state across that checkout. See `/commit-merge` and
   commits, because its new test would fail the checks.
 - `tests` is the build list. `/decompose` writes it (`origin: planned`)
   after the human approves the whole map. Approved discovery proposals
-  are appended (`origin: discovered`). Nothing else adds to it: discovery
-  only proposes. The head non-`done` item is the next test, in both modes.
+  are appended (`origin: discovered`), as are behaviour findings accepted
+  at `/review` (`origin: review`). Nothing else adds to it: discovery
+  and review only propose. The head non-`done` item is the next test, in both modes.
   A collaborator is `done` when all its tests are.
 - `discovery_rounds` counts inner-loop discovery rounds. The builder (or,
   in granular mode, the driver) runs discovery only while it is 0, then
@@ -157,7 +158,12 @@ session.yml can carry state across that checkout. See `/commit-merge` and
   validates the target phase on every edit to session.yml — it blocks
   backward moves and moves into a phase whose precondition isn't actually
   met yet (e.g. `close` requires every collaborator and every test `done`; GREENFIELD `inner` requires a non-empty `tests:` list), so a step
-  can't be skipped by writing the field directly. The one exception: a
+  can't be skipped by writing the field directly. One backward move is
+  allowed: `close → inner`, while a `tests:` entry with `origin: review`
+  is open, so `/review` can send an accepted behaviour finding back
+  through a failing test first (the GREENFIELD red-acceptance check is
+  waived on that re-entry, since wiring may have turned it green). The
+  forward exception: a
   SAFE/FULL_REFACTOR slice with `net.kind: existing`, `net.status: green`
   and an empty `tests:` list may enter `close` with no collaborators,
   since it refactors under its green net and builds nothing new.
