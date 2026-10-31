@@ -77,7 +77,9 @@ on feature/<slice>-tmp.
    suite should shrink over time.
 6. **Reflection (from the skill):** any awkward mock (design smell)?
    duplicated setup? happy AND sad path covered?
-7. Final commit on feature/<slice>-tmp. Set `phase: done`.
+7. Set `phase: done`, then make the final commit on feature/<slice>-tmp
+   so it carries that change. `/commit-merge` needs a clean tree, and
+   `git checkout feature/<slice>-main` refuses a modified session.yml.
 8. Tell the user: the slice is closed, next command is `/commit-merge` to
    land it on feature/<slice>-main (manual by default, `--auto` to let the
    agent run the squash-merge itself). This step is identical in batch and

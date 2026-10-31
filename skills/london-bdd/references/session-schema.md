@@ -190,7 +190,10 @@ session.yml can carry state across that checkout. See `/commit-merge` and
   validates the target phase on every edit to session.yml — it blocks
   backward moves and moves into a phase whose precondition isn't actually
   met yet (e.g. `close` requires every collaborator and every test `done`; GREENFIELD `inner` requires a non-empty `tests:` list), so a step
-  can't be skipped by writing the field directly. One backward move is
+  can't be skipped by writing the field directly. The target phase is
+  read from the file as the edit would leave it, and from a documented
+  phase it must be another documented one: moving to an unlisted value,
+  or deleting the `phase:` line, is refused. One backward move is
   allowed: `close → inner`, while a `tests:` entry with `origin: review`
   is open, so `/review` can send an accepted behaviour finding back
   through a failing test first (the GREENFIELD red-acceptance check is

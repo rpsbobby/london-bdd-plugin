@@ -23,7 +23,8 @@ ground. Read the `london-bdd` skill and `references/design-template.md`.
    is expected next. Design the next slice once this one lands.
 2. No git requirements. `/design` creates no branch and makes no commit:
    the file stays untracked until `/scenario` commits it on
-   `feature/<slice>-tmp`.
+   `feature/<slice>-tmp`. If the previous slice is `done` but not landed
+   yet, `/commit-merge` leaves this file in place.
 
 ## Steps
 

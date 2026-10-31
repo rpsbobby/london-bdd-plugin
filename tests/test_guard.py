@@ -466,6 +466,65 @@ def test_one_write_cannot_move_backward_by_rewriting_the_phase(repo):
     assert "Rule D" in err
 
 
+def test_phase_move_is_read_from_the_result_not_the_new_text(repo):
+    """An Edit whose new_string never says `phase:` still moves the phase
+    when its old_string spans the value; Rule D checks the result."""
+    open_slice(repo, "x", phase="inner", mode="GREENFIELD")
+    code, err = session_edit(repo, {"old_string": "inner\nbranch",
+                                    "new_string": "done\nbranch"})
+    assert code == 2
+    assert "Rule D" in err
+
+
+def test_multiedit_phase_is_read_from_the_final_result(repo):
+    """A first edit that writes the current phase can't hide a later one
+    that changes it."""
+    open_slice(repo, "x", phase="inner", mode="GREENFIELD")
+    code, err = session_edit(repo, {"edits": [
+        {"old_string": "slice: x", "new_string": "slice: x  # phase: inner"},
+        {"old_string": "inner\nbranch", "new_string": "done\nbranch"},
+    ]})
+    assert code == 2
+    assert "Rule D" in err
+
+
+def test_blocks_moving_to_an_undocumented_phase(repo):
+    open_slice(repo, "x", phase="done")
+    code, err = edit_session(repo, "wip")
+    assert code == 2
+    assert "Rule D" in err
+
+
+def test_blocks_deleting_the_phase_line(repo):
+    open_slice(repo, "x", phase="done")
+    code, err = session_edit(repo, {"old_string": "phase: done\n",
+                                    "new_string": ""})
+    assert code == 2
+    assert "Rule D" in err
+
+
+@pytest.mark.parametrize("via", ["scope", "scenario"])
+def test_schema_phases_cannot_launder_a_backward_move(repo, via):
+    """scope and scenario are documented phases, so moving into one from
+    done is backward, and nothing gets back to inner through them."""
+    open_slice(repo, "x", phase="done",
+               **{"collaborators": "\n  - role: A\n    status: pending",
+                  "tests": REVIEW_TEST,
+                  "acceptance_test": "\n  status: red"})
+    code, err = edit_session(repo, via)
+    assert code == 2
+    assert "backward" in err
+
+
+def test_allows_leaving_a_custom_phase_forward(repo):
+    """A session already on an undocumented phase isn't held to the order;
+    the target phase's preconditions still apply."""
+    open_slice(repo, "x", phase="wip",
+               **{"collaborators": "\n  - role: A\n    status: done"})
+    code, err = edit_session(repo, "close")
+    assert code == 0, err
+
+
 def test_blocks_inner_safe_without_green_characterisation(repo):
     open_slice(repo, "x", phase="characterise", mode="SAFE")
     code, err = edit_session(repo, "inner")

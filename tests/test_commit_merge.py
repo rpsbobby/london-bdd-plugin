@@ -90,3 +90,31 @@ def test_manual_mode_keeps_slice_notes_and_drops_the_rest_of_bdd(repo):
     sh(repo, code_block("Manual mode"))
     assert landed(repo) == SLICE_NOTES + ["src/order.py"]
     assert not (repo / ".bdd").exists()
+
+
+def next_slice_design(repo):
+    """/design may run for the next slice once this one is done, before
+    /commit-merge: its notes are untracked and must survive the landing."""
+    nxt = repo / ".bdd" / "design-next.md"
+    nxt.write_text("# Design — next\n")
+    return nxt
+
+
+def test_auto_mode_keeps_the_next_slices_design_notes(repo):
+    build_slice(repo)
+    nxt = next_slice_design(repo)
+    land_auto(repo)
+    assert nxt.read_text() == "# Design — next\n"
+    assert landed(repo) == SLICE_NOTES + ["src/order.py"]
+    left = sorted(p.name for p in (repo / ".bdd").iterdir())
+    assert left == [".merge-authorized", "design-next.md"]
+
+
+def test_manual_mode_keeps_the_next_slices_design_notes(repo):
+    build_slice(repo)
+    nxt = next_slice_design(repo)
+    sh(repo, code_block("Manual mode"))
+    assert nxt.read_text() == "# Design — next\n"
+    assert landed(repo) == SLICE_NOTES + ["src/order.py"]
+    assert sorted(p.name for p in (repo / ".bdd").iterdir()) == [
+        "design-next.md"]

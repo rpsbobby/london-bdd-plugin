@@ -176,7 +176,10 @@ def parse_session_text(text):
     return s
 
 
-PHASE_ORDER = ["characterise", "decompose", "inner", "close", "done"]
+# Every phase session-schema.md documents, in order. A phase missing here
+# would be a way around the backward check: move into it, then out of it.
+PHASE_ORDER = ["scope", "characterise", "scenario", "decompose", "inner",
+               "close", "done"]
 
 
 def net_status(s):
@@ -192,29 +195,14 @@ NET_FIX = ("declare the existing green suite as the net (/refactor-scope) "
            "or build one (/characterise)")
 
 
-def extract_new_phase(tool_input):
-    """Pull the phase: value an in-flight edit would write, from whichever
-    shape the tool uses (Write's content, Edit's new_string, MultiEdit's
-    edits[].new_string). Returns None if this edit doesn't touch phase:."""
-    chunks = []
-    if "content" in tool_input:
-        chunks.append(tool_input["content"])
-    if "new_string" in tool_input:
-        chunks.append(tool_input["new_string"])
-    for e in tool_input.get("edits") or []:
-        if "new_string" in e:
-            chunks.append(e["new_string"])
-    text = "\n".join(chunks)
-    m = re.search(r"^phase:\s*(\S+)", text, re.M)
-    return m.group(1) if m else None
-
-
 def session_after_edit(session_path, tool_input):
     """The text session.yml would hold once this Write/Edit/MultiEdit
     lands, so Rule D checks the preconditions of the phase it enters
     against the edit's own result: /decompose can record the map and move
-    to inner in one write. An old_string that isn't there leaves the text
-    unchanged; the tool call fails anyway."""
+    to inner in one write. The phase it enters is read from that result
+    too, never from the edit's new text, so an edit can't move the phase
+    by leaving `phase:` out of its new_string. An old_string that isn't
+    there leaves the text unchanged; the tool call fails anyway."""
     if "content" in tool_input:
         return tool_input["content"]
     try:
@@ -238,10 +226,19 @@ def validate_phase_transition(s, new_phase):
     that line is just prose the agent is trusted to self-enforce, and
     .bdd/session.yml is otherwise unguarded (it must stay writable for the
     commands that legitimately advance it). Returns an error message, or
-    None if the transition is legal. Unrecognized phase values (custom
-    workflows) are waved through — this only polices the documented ones."""
+    None if the transition is legal. From a documented phase, the target
+    must be a documented phase too; otherwise moving out to an unknown
+    value (or deleting the line) and back would skip the backward check.
+    A session already on an unknown phase (custom workflows) isn't held to
+    the order, but the preconditions of a documented phase it enters still
+    apply."""
     old_phase = s["phase"]
     if new_phase not in PHASE_ORDER:
+        if old_phase in PHASE_ORDER:
+            shown = new_phase if new_phase else "(no phase)"
+            return (f"Rule D: cannot move from '{old_phase}' to '{shown}' — "
+                    "phase must be one of "
+                    f"{' | '.join(PHASE_ORDER)} (session-schema.md).")
         return None
     review_reentry = False
     if old_phase in PHASE_ORDER and (
@@ -655,12 +652,12 @@ def main():
     # writable for legitimate transitions, but the *value* written must
     # be an earned one.
     if r.replace(os.sep, "/") == ".bdd/session.yml":
-        new_phase = extract_new_phase(tool_input)
-        if new_phase and new_phase != s["phase"]:
-            # Preconditions from the edit's result; the phase it moves
-            # from stays the one on disk.
-            after = parse_session_text(
-                session_after_edit(session_path, tool_input))
+        # The phase entered and its preconditions both come from the edit's
+        # result; the phase it moves from stays the one on disk.
+        after = parse_session_text(
+            session_after_edit(session_path, tool_input))
+        new_phase = after["phase"]
+        if new_phase != s["phase"]:
             after["phase"] = s["phase"]
             err = validate_phase_transition(after, new_phase)
             if err:

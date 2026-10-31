@@ -9,7 +9,10 @@ description: Land the slice — squash-merge feature/<slice>-tmp onto feature/<s
 
 1. `.bdd/session.yml`: `phase: done` (set by `/review`'s final step).
    Otherwise STOP and tell the user which command is expected first.
-2. On `feature/<slice>-tmp`, working tree clean.
+2. On `feature/<slice>-tmp`, working tree clean. One exception: an
+   untracked `.bdd/design-<next>.md` that `/design` wrote for a later
+   slice (it may run once this one is `done`). The cleanup below leaves
+   it in place for that slice's `/scenario`.
 
 ## Build the summary (both modes)
 
@@ -30,14 +33,18 @@ for n in design scope review; do
   [ -f .bdd/$n-<slice>.md ] || continue
   mkdir -p docs/slices/<slice> && cp .bdd/$n-<slice>.md docs/slices/<slice>/$n.md
 done; [ -d docs/slices/<slice> ] && git add docs/slices/<slice>
-git restore --staged .bdd/ 2>/dev/null; rm -rf .bdd/
+git restore --staged .bdd/ 2>/dev/null
+find .bdd -mindepth 1 ! -path '.bdd/design-*.md' -delete
+rm -f .bdd/design-<slice>.md; rmdir .bdd 2>/dev/null || true
 git commit -m "<message>"
 ```
 The loop keeps the slice's design, scope and review notes in
 `docs/slices/<slice>/` (`design.md`, `scope.md`, `review.md`, whichever
 exist), so they outlive the disposable tmp branch; the rest of `.bdd/`
-stays out. Do not run them. Tell the user this is theirs to run by hand, and that
-`feature/<slice>-tmp` is disposable once merged — delete it whenever.
+stays out. The `find` spares other slices' design notes: `/design` may
+already have written the next one's. Do not run them. Tell the user this
+is theirs to run by hand, and that `feature/<slice>-tmp` is disposable
+once merged — delete it whenever.
 
 ## Auto mode (`/commit-merge --auto`)
 
@@ -65,16 +72,19 @@ reconcile against the target branch's tree.
    review notes are copied to `docs/slices/<slice>/` and land with the
    slice, since `feature/<slice>-tmp` is disposable. The rest of `.bdd/`
    (session.yml, the archive) stays out, as in manual mode, except the
-   untracked marker, which the next step still needs:
+   untracked marker, which the next step still needs, and other slices'
+   design notes, which `/design` may already have written:
    ```
    for n in design scope review; do
      [ -f .bdd/$n-<slice>.md ] || continue
      mkdir -p docs/slices/<slice> && cp .bdd/$n-<slice>.md docs/slices/<slice>/$n.md
    done; [ -d docs/slices/<slice> ] && git add docs/slices/<slice>
-   git restore --staged .bdd/ 2>/dev/null; find .bdd -mindepth 1 ! -name .merge-authorized -delete
+   git restore --staged .bdd/ 2>/dev/null
+   find .bdd -mindepth 1 ! -path .bdd/.merge-authorized ! -path '.bdd/design-*.md' -delete
+   rm -f .bdd/design-<slice>.md
    ```
 6. `git commit -m "<message>"`
-7. Clean up: `rm -f .bdd/.merge-authorized`.
+7. Clean up: `rm -f .bdd/.merge-authorized; rmdir .bdd 2>/dev/null || true`.
 8. **Never push.** Pushing to a remote is always the developer's own
    action, in every mode.
 9. Report the result (commit hash, files, behaviours) and remind the user
