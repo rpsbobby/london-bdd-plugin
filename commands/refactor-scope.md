@@ -63,8 +63,7 @@ skill and `references/scope-template.md`.
    <existing|characterisation> [--net-suite <path>...]` (FULL_REFACTOR
    also takes `--acceptance-file`/`--acceptance-name`). It writes `mode`,
    the scope block, branch fields, the `net:` block, `inner`, `checks`,
-   and defaults `phase` to what the net decision earned (override with
-   `--phase`):
+   and sets `phase` to what the net decision earned:
    - net still to build → `phase: characterise`
    - net existing + green → `phase: inner` (SAFE) or `phase: decompose`
      (FULL_REFACTOR)

@@ -14,7 +14,7 @@ Edit/Write call so guard Rule D (validate_phase_transition) checks them.
 
 Usage:
   session.py init --slice S --mode M --checks-tests CMD
-                  [--inner batch|granular] [--phase P] [--base-branch B]
+                  [--inner batch|granular] [--base-branch B]
                   [--acceptance-file F --acceptance-name N]
                   [--scope-in G]... [--scope-out G]...
                   [--net-kind K --net-suite P... --net-status S] [--force]
@@ -277,7 +277,7 @@ def cmd_commit_cycle(args):
         text = drop_block(text, "current_failing_test")
         text = set_top(text, "cycle", f"cycle: {n}")
         return set_top(text, "last_commit",
-                       f"last_commit: {json.dumps(args.message)}")
+                       f"last_commit: {json.dumps(args.message, ensure_ascii=False)}")
     return update(args, edit)
 
 
@@ -327,8 +327,12 @@ def render_init(a):
         check_enum(a.net_kind, ("existing", "characterisation"), "net kind")
     if a.net_status is not None:
         check_enum(a.net_status, NET_STATUS, "net status")
-    phase = a.phase or default_phase(a.mode, a.net_kind)
-    check_enum(phase, PHASES, "phase")
+    if a.net_kind == "existing" and a.net_status not in (None, "green"):
+        raise ValueError("an existing net is declared only after a green "
+                         "run; build one with --net-kind characterisation")
+    # No --phase override: the default is the phase the answers earned, and
+    # anything later must be reached through Rule D's preconditions.
+    phase = default_phase(a.mode, a.net_kind)
     if a.mode != "SAFE" and not (a.acceptance_file and a.acceptance_name):
         raise ValueError(f"{a.mode} needs --acceptance-file and "
                          "--acceptance-name")
@@ -416,7 +420,6 @@ def build_parser():
     sp.add_argument("--acceptance-file")
     sp.add_argument("--acceptance-name")
     sp.add_argument("--base-branch")
-    sp.add_argument("--phase")
     sp.add_argument("--scope-in", action="append", default=[])
     sp.add_argument("--scope-out", action="append", default=[])
     sp.add_argument("--net-kind")

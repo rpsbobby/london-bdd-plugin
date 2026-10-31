@@ -162,6 +162,13 @@ def test_commit_cycle_bumps_cycle_sets_last_commit_clears_failing(tmp_path):
     assert run("validate", p)[0] == 0
 
 
+def test_commit_cycle_keeps_non_ascii_message_readable(tmp_path):
+    p = session_file(tmp_path)
+    assert run("commit-cycle", "--message", "cycle 4: A — does B",
+               "--file", p)[0] == 0
+    assert 'last_commit: "cycle 4: A — does B"' in p.read_text()
+
+
 def test_set_failing_test_records_file_and_name(tmp_path):
     p = session_file(tmp_path)
     run("commit-cycle", "--message", "m", "--file", p)
@@ -281,12 +288,27 @@ def test_init_writes_file_that_validates_and_guard_reads_back(tmp_path):
 
 def test_init_honours_options(tmp_path):
     code, _, _ = run(*init_args(tmp_path, "--inner", "granular",
-                                "--base-branch", "feature/other-main",
-                                "--phase", "scenario"))
+                                "--base-branch", "feature/other-main"))
     assert code == 0
     s = guard_mod.parse_session(str(tmp_path / ".bdd" / "session.yml"))
-    assert (s["inner"], s["base_branch"], s["phase"]) == (
-        "granular", "feature/other-main", "scenario")
+    assert (s["inner"], s["base_branch"]) == (
+        "granular", "feature/other-main")
+
+
+def test_init_rejects_existing_net_that_is_not_green(tmp_path):
+    p = tmp_path / ".bdd" / "session.yml"
+    code, _, _ = run("init", "--slice", "tidy", "--mode", "SAFE",
+                     "--checks-tests", "pytest", "--scope-in", "src/a.py",
+                     "--net-kind", "existing", "--net-suite", "tests/",
+                     "--net-status", "red", "--file", p)
+    assert code != 0 and not p.exists()
+
+
+def test_init_has_no_phase_override(tmp_path):
+    # a chosen phase would skip Rule D's preconditions on a fresh file
+    code, _, _ = run(*init_args(tmp_path, "--phase", "inner"))
+    assert code != 0
+    assert not (tmp_path / ".bdd" / "session.yml").exists()
 
 
 def test_init_refuses_overwrite_without_force(tmp_path):
