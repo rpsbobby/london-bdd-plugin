@@ -85,7 +85,8 @@ def parse_session(path):
          "phase": None, "char_status": None, "net_status": None,
          "net_kind": None, "acceptance_status": None, "inner": "batch",
          "collaborators": [], "tests": [], "cycle": 0,
-         "checks_tests": None, "acceptance_file": None, "net_suites": []}
+         "checks_tests": None, "acceptance_file": None,
+         "acceptance_name": None, "net_suites": []}
     try:
         text = open(path, encoding="utf-8").read()
     except OSError:
@@ -127,6 +128,12 @@ def parse_session(path):
         if st: s["acceptance_status"] = st.group(1)
         f = re.search(r"\bfile:\s*(\S+)", m.group(1))
         if f: s["acceptance_file"] = f.group(1)
+        n = re.search(r"\bname:[ \t]*(\S.*?)[ \t]*$", m.group(1), re.M)
+        if n:
+            name = n.group(1)
+            if len(name) > 1 and name[0] == name[-1] and name[0] in "'\"":
+                name = name[1:-1]
+            s["acceptance_name"] = name or None
     m = re.search(r"^checks:\s*\n((?:[ \t]+.*\n?)*)", text, re.M)
     if m:
         tp = re.search(r"^[ \t]+tests:[ \t]*(\S.*?)[ \t]*$", m.group(1), re.M)
@@ -442,7 +449,15 @@ def run_tests_in_scope(s, root):
         return None
     args = " ".join(shlex.quote(f) for f in files)
     tpl = s["checks_tests"]
-    cmd = tpl.replace("{files}", args) if "{files}" in tpl else f"{tpl} {args}"
+    # {outer_net}: the acceptance test's name until phase close (it is red on
+    # purpose), empty from close on. Shell-quoted like {files}, so write it
+    # unquoted: `go test -skip {outer_net} ...`. Empty becomes '', which
+    # `go test -skip` reads as "skip nothing".
+    outer = "" if s["phase"] in ("close", "done") else s["acceptance_name"] or ""
+    subs = {"{files}": args, "{outer_net}": shlex.quote(outer)}
+    cmd = re.sub(r"\{files\}|\{outer_net\}", lambda m: subs[m.group(0)], tpl)
+    if "{files}" not in tpl:
+        cmd = f"{cmd} {args}"
     try:
         proc = subprocess.run(cmd, shell=True, cwd=root, capture_output=True,
                               text=True, timeout=CHECKS_TIMEOUT)

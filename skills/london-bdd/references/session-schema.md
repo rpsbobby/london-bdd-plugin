@@ -121,7 +121,14 @@ session.yml can carry state across that checkout. See `/commit-merge` and
   failure blocks the commit with the output. Absent = no test run, but
   the repo's git hooks are still protected from being skipped. Set at
   slice start (`/scenario`, `/refactor-scope`). The red step never
-  commits, because its new test would fail the checks.
+  commits, because its new test would fail the checks. Optional
+  `{outer_net}` is replaced with `acceptance_test.name` (shell-quoted;
+  write it unquoted) before phase `close` and with an empty string from
+  `close` on, or when no name is recorded. For runners that scope by
+  package (Go), it keeps the red outer net out of the inner commits:
+  `go test -skip {outer_net} ./pkg/...`. The empty `''` is fine for
+  `go test -skip` (skips nothing). The name is passed as-is, so for
+  `-skip` it is a regexp.
 - `tests` is the build list. `/decompose` writes it (`origin: planned`)
   after the human approves the whole map. Approved discovery proposals
   are appended (`origin: discovered`), as are behaviour findings accepted

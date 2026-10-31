@@ -771,3 +771,53 @@ def test_no_checks_template_runs_no_tests(repo):
     write_file(repo, "tests/test_order.py", FAILING)
     code, _ = guard(repo, "bash", command="git add -A && git commit -m c")
     assert code == 0
+
+
+# ---- Rule E: {outer_net} keeps the red outer net out of inner commits --
+
+# Always fails, printing what the placeholder became between brackets.
+SHOW_OUTER = "sh -c 'echo \"OUTER[$0]\"; exit 1' {outer_net}"
+ACCEPTANCE = ("\n  file: tests/acceptance/test_place.py"
+              "\n  name: TestPlaceOrder\n  status: red")
+
+
+def commit_with_outer_net(repo, phase, tpl=SHOW_OUTER, acceptance=ACCEPTANCE):
+    open_slice(repo, "x", phase=phase, checks=f"\n  tests: {tpl}",
+               acceptance_test=acceptance)
+    write_file(repo, "tests/test_order.py", PASSING)
+    return guard(repo, "bash", command="git add -A && git commit -m c")
+
+
+def test_outer_net_is_the_acceptance_test_name_before_close(repo):
+    code, err = commit_with_outer_net(repo, "inner")
+    assert code == 2
+    assert "OUTER[TestPlaceOrder]" in err
+
+
+def test_outer_net_is_empty_from_close_on(repo):
+    code, err = commit_with_outer_net(repo, "close")
+    assert code == 2
+    assert "OUTER[]" in err
+
+
+def test_outer_net_is_empty_without_a_recorded_name(repo):
+    code, err = commit_with_outer_net(
+        repo, "inner", acceptance="\n  file: tests/acceptance/test_place.py")
+    assert code == 2
+    assert "OUTER[]" in err
+
+
+def test_outer_net_name_cannot_inject_shell(repo):
+    evil = "\"x'; touch pwned; echo '\""
+    code, err = commit_with_outer_net(
+        repo, "inner", acceptance=f"\n  name: {evil}\n  status: red")
+    assert code == 2
+    assert not (repo / "pwned").exists()
+
+
+def test_template_without_outer_net_is_unchanged(repo):
+    code, err = commit_with_outer_net(
+        repo, "inner", tpl="sh -c 'echo \"FILES[$*]\"; exit 1' _ {files}")
+    assert code == 2
+    assert "FILES[tests/test_order.py]" in err
+
