@@ -14,14 +14,15 @@ before proceeding.
 1. Read `.bdd/session.yml` if it exists.
    - If a slice is active and `phase != done`: STOP. Tell the user which
      slice/phase is active and which command is expected next.
-   - If the previous slice is `done`: archive it to `.bdd/archive/`.
+   - If the previous slice is `done`: move it to `.bdd/archive/<slice>.yml`
+     (move, not copy: no session.yml may remain before step 6 of Phase 1).
 2. Check git state: must be clean. Never auto-stash.
 
 ## Phase 0 — Discuss (do not skip, do not rush)
 
 Work through these WITH the user. Points 0 and 1 are independent
-decisions: settle each one on its own, in order. Points 2–5 hang
-together, so once the behaviour sentence is agreed, propose all four in
+decisions: settle each one on its own, in order. Points 2–6 hang
+together, so once the behaviour sentence is agreed, propose them all in
 one message for a single confirmation (the user can still edit any of
 them). Split them back out only when one is genuinely open, e.g. a new
 term the glossary doesn't settle.
@@ -37,6 +38,13 @@ term the glossary doesn't settle.
 4. **One meaningful sad path** to cover alongside the happy path.
 5. **Clean architecture boundary** — which layer does the AT enter through?
    (Application layer preferred; UI entry only for smoke tests.)
+6. **Outer net kind.** `dsl` (the default) is the DSL acceptance test
+   above. Propose `contract` when the slice adds an adapter behind a port
+   that already exists (a Kubernetes `RunStore` next to the in-memory
+   one): the outer red is then the port's contract suite, run against
+   every subject. It passes against the subjects that already exist (the
+   fake, other adapters) and fails against the new one. Agree the
+   subjects with the user.
 
 ## Phase 1 — Scenario + failing AT
 
@@ -50,6 +58,15 @@ term the glossary doesn't settle.
    (DSL-driven, Given/When/Then, **no mocks, no test doubles of our own
    code**). It must compile and fail for the right reason (behaviour
    absent, not setup error). Run it and show the output.
+   For a `contract` net, write (or extend) the port's contract suite so
+   it runs once per subject, and add the new adapter as a subject. If the
+   new adapter has to exist for the suite to compile, write its **empty
+   stub**: the type, its constructor, and the port's methods, each
+   failing with "not implemented" (or returning the zero value), in the
+   adapter's real production file. No behaviour, no branches, no
+   collaborators: `/inner` builds those under failing unit tests. Don't
+   put a placeholder store in the test file instead. Show the run: green
+   for the existing subjects, red for the new one, for "not implemented".
 4. **Ask the inner-loop question:** "Build the approved test list in
    `batch` (one builder agent builds it all, then you and I review the
    result and its discovery proposals: default), or `granular` (one test
@@ -72,11 +89,15 @@ term the glossary doesn't settle.
      --checks-tests "<checks command>" \
      --acceptance-file <test file> --acceptance-name "<test name>"
    ```
+   For a `contract` net, add `--acceptance-kind contract`, one
+   `--subject <name>` per subject (at least two: one already green, and
+   the new one), and `--stub <path>` when step 3 wrote a stub.
    This writes `phase: decompose`, `acceptance_test.status: red`, the
    branch fields (`feature/<slice>-tmp`, base `feature/<slice>-main`),
    `cycle: 0` and an empty collaborator list. It refuses to overwrite an
    existing file; archive a finished slice first (precondition 1).
 7. Commit on feature/<slice>-tmp: `test: failing acceptance test — <slice>`
+   (a `contract` net's stub goes in this commit too)
    (if the slice came from `docs/backlog.md`, remove that entry in the
    same commit).
 8. Announce: `🔴 AT: <behaviour>` and tell the user the next command is
@@ -84,7 +105,11 @@ term the glossary doesn't settle.
 
 ## Rules
 
-- Never write production code in this command.
+- Never write production code in this command. The one exception is a
+  `contract` net's empty stub (Phase 1 step 3): signatures only, every
+  method "not implemented". It's written before session.yml exists, so
+  the guard doesn't police it. Keep it empty: `/decompose` checks it
+  before mapping.
 - Never invent collaborators here — that is /decompose's job.
 - If the user cannot state the behaviour in one sentence, the slice is too
   big. Help them cut it thinner before writing anything.

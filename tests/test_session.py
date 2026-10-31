@@ -374,3 +374,63 @@ def test_init_quotes_values_the_guard_reads_back_verbatim(tmp_path):
     s = guard_mod.parse_session(str(p))
     assert s["checks_tests"] == "go test -skip ^{outer_net}$ ./pkg/..."
     assert s["acceptance_name"] == "TestX: does y # z"
+
+
+# ---- contract outer net (issue #7) ----------------------------------
+
+def contract_args(tmp_path, *extra):
+    return init_args(tmp_path, "--acceptance-kind", "contract",
+                     "--subject", "InMemoryRunStore",
+                     "--subject", "k8s.RunStore", *extra)
+
+
+def test_init_contract_records_subjects_and_stub(tmp_path):
+    code, _, err = run(*contract_args(tmp_path, "--stub",
+                                      "internal/k8s/run_store.go"))
+    assert code == 0, err
+    p = tmp_path / ".bdd" / "session.yml"
+    text = p.read_text()
+    assert "  kind: contract\n" in text
+    assert "    - InMemoryRunStore\n    - k8s.RunStore\n" in text
+    assert "  stub: internal/k8s/run_store.go\n" in text
+    assert run("validate", p)[0] == 0
+    # the guard still reads the outer net it keys Rules D and E off
+    s = guard_mod.parse_session(str(p))
+    assert s["acceptance_status"] == "red"
+    assert s["acceptance_file"] == "tests/acceptance/place_order_test.py"
+    assert s["acceptance_name"] == "PlaceOrder.ReturnsId"
+
+
+def test_init_dsl_default_writes_no_kind(tmp_path):
+    assert run(*init_args(tmp_path))[0] == 0
+    assert "kind:" not in (tmp_path / ".bdd" / "session.yml").read_text()
+
+
+def test_init_contract_needs_two_subjects(tmp_path):
+    code, _, err = run(*init_args(tmp_path, "--acceptance-kind", "contract",
+                                  "--subject", "k8s.RunStore"))
+    assert code != 0 and "two" in err
+    assert not (tmp_path / ".bdd" / "session.yml").exists()
+
+
+def test_init_subjects_and_stub_need_contract_kind(tmp_path):
+    assert run(*init_args(tmp_path, "--subject", "A"))[0] != 0
+    assert run(*init_args(tmp_path, "--stub", "src/a.py"))[0] != 0
+    assert run(*init_args(tmp_path, "--acceptance-kind", "e2e"))[0] != 0
+
+
+def test_validate_flags_contract_without_enough_subjects(tmp_path):
+    p = session_file(tmp_path, GOOD.replace(
+        "  status: red\ncollaborators:",
+        "  kind: contract\n  subjects:\n    - k8s.RunStore\n"
+        "  status: red\ncollaborators:"))
+    code, _, err = run("validate", p)
+    assert code != 0 and "two subjects" in err
+
+
+def test_validate_flags_unknown_acceptance_kind(tmp_path):
+    p = session_file(tmp_path, GOOD.replace(
+        "  status: red\ncollaborators:",
+        "  kind: e2e\n  status: red\ncollaborators:"))
+    code, _, err = run("validate", p)
+    assert code != 0 and "acceptance_test.kind" in err

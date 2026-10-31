@@ -12,6 +12,12 @@ Read the `london-bdd` skill, `references/collaborator-discovery.md`, and
 
 1. `.bdd/session.yml`: `phase: decompose`, outer net red (AT) or green
    (characterisation), on feature/<slice>-tmp.
+2. `acceptance_test.kind: contract` with a `stub:`: read the stub. It
+   holds signatures only, every method "not implemented". Anything more
+   (a branch, a field, a call to a collaborator) is behaviour no test
+   drove: show it to the user, and either give it a test in the map or
+   have them empty the stub by hand (Rule A blocks the agent from editing
+   production code before a failing unit test exists).
 
 ## Steps
 

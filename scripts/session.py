@@ -16,6 +16,7 @@ Usage:
   session.py init --slice S --mode M --checks-tests CMD
                   [--inner batch|granular] [--base-branch B]
                   [--acceptance-file F --acceptance-name N]
+                  [--acceptance-kind contract --subject X... [--stub P]]
                   [--scope-in G]... [--scope-out G]...
                   [--net-kind K --net-suite P... --net-status S] [--force]
   session.py validate [path]
@@ -48,6 +49,7 @@ COLLAB_STATUS = ("pending", "red", "done")
 TEST_STATUS = ("pending", "red", "green", "done")
 ORIGINS = ("planned", "discovered", "review")
 ACCEPT_STATUS = ("red", "green", "absent")
+ACCEPT_KIND = ("dsl", "contract")
 NET_STATUS = ("red", "green", "absent")
 
 
@@ -99,6 +101,7 @@ def problems(text, path):
         if m:
             one_of(errors, "acceptance_test.status", m.group(1),
                    ACCEPT_STATUS)
+        errors.extend(contract_problems(acc))
     net = block(text, "net")
     if net is not None:
         m = re.search(r"\bstatus:[ \t]*(\S+)", net)
@@ -145,6 +148,27 @@ def problems(text, path):
         if m.group(1) not in KNOWN:
             warnings.append(f"unknown top-level key '{m.group(1)}'")
     return errors, warnings
+
+
+def contract_problems(acc):
+    """A contract outer net names the suite's subjects: at least one that
+    already passes (the fake or an existing adapter) and the new one."""
+    errors = []
+    m = re.search(r"^[ \t]+kind:[ \t]*(\S+)", acc, re.M)
+    kind = m.group(1) if m else "dsl"
+    one_of(errors, "acceptance_test.kind", kind, ACCEPT_KIND)
+    su = re.search(r"^[ \t]+subjects:[ \t]*\n((?:[ \t]+-.*\n?)*)", acc, re.M)
+    subjects = re.findall(r"^[ \t]+-[ \t]*(\S.*?)[ \t]*$", su.group(1),
+                          re.M) if su else []
+    stub = re.search(r"^[ \t]+stub:", acc, re.M)
+    if kind == "contract" and len(subjects) < 2:
+        errors.append("acceptance_test: kind contract needs at least two "
+                      "subjects: one the suite already passes against, "
+                      "and the new one")
+    if kind != "contract" and (subjects or stub):
+        errors.append("acceptance_test: subjects and stub belong to kind "
+                      "contract only")
+    return errors
 
 
 def read(path):
@@ -339,6 +363,17 @@ def render_init(a):
     if bool(a.acceptance_file) != bool(a.acceptance_name):
         raise ValueError("--acceptance-file and --acceptance-name go "
                          "together")
+    check_enum(a.acceptance_kind, ACCEPT_KIND, "acceptance kind")
+    contract = a.acceptance_kind == "contract"
+    if contract and not a.acceptance_file:
+        raise ValueError("--acceptance-kind contract needs "
+                         "--acceptance-file and --acceptance-name")
+    if contract and len(a.subject) < 2:
+        raise ValueError("a contract suite needs at least two --subject: "
+                         "one it already passes against, and the new one")
+    if not contract and (a.subject or a.stub):
+        raise ValueError("--subject and --stub go with --acceptance-kind "
+                         "contract")
     if a.mode != "GREENFIELD" and not a.net_kind:
         raise ValueError(f"{a.mode} needs --net-kind (existing | "
                          "characterisation)")
@@ -352,8 +387,14 @@ def render_init(a):
     if a.acceptance_file:
         out += ["acceptance_test:",
                 f"  file: {yaml_scalar(a.acceptance_file, 'acceptance-file')}",
-                f"  name: {yaml_scalar(a.acceptance_name, 'acceptance-name')}",
-                "  status: red"]
+                f"  name: {yaml_scalar(a.acceptance_name, 'acceptance-name')}"]
+        if contract:
+            out[-2:-2] = ["  kind: contract"]
+            out += ["  subjects:"]
+            out += [f"    - {yaml_scalar(x, 'subject')}" for x in a.subject]
+            if a.stub:
+                out += [f"  stub: {yaml_scalar(a.stub, 'stub')}"]
+        out += ["  status: red"]
     if a.net_kind:
         out += ["net:", f"  kind: {a.net_kind}", "  suites:"]
         out += [f"    - {yaml_scalar(x, 'net-suite')}" for x in a.net_suite]
@@ -419,6 +460,9 @@ def build_parser():
     sp.add_argument("--checks-tests", required=True)
     sp.add_argument("--acceptance-file")
     sp.add_argument("--acceptance-name")
+    sp.add_argument("--acceptance-kind", default="dsl")
+    sp.add_argument("--subject", action="append", default=[])
+    sp.add_argument("--stub")
     sp.add_argument("--base-branch")
     sp.add_argument("--scope-in", action="append", default=[])
     sp.add_argument("--scope-out", action="append", default=[])

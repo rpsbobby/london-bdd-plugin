@@ -15,7 +15,8 @@ on feature/<slice>-tmp.
 1. **Wire the composition root.** Real implementations composed at the
    boundary; no test doubles leak into production wiring.
 2. **Run the outer net.**
-   - GREENFIELD: acceptance test → expect `🟢 AT`. Still red → treat as a
+   - GREENFIELD: acceptance test → expect `🟢 AT`. A `contract` net is
+     green only when every subject in `acceptance_test.subjects` passes. Still red → treat as a
      new inner-loop entry point (missing wiring is the usual cause);
      re-open `phase: inner` with the discovered collaborator.
    - SAFE/FULL_REFACTOR: re-run the declared net (`net.suites` in

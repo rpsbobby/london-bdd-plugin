@@ -63,6 +63,14 @@ Read the `london-bdd` skill. Language tooling:
    (an approved `this-slice` AT), go back to it: the UTs this AT needs
    get approved into `tests:` there.
 
+## Contract suites (`acceptance_test.kind: contract`)
+
+When the slice adds an adapter behind an existing port, the outer net is
+the port's contract suite instead of a DSL scenario (see `/scenario`
+Phase 0 point 6). The same rules hold: externally visible outcomes of
+the port only, `should_` names, a sad path. It runs once per subject,
+and the new adapter is red for "not implemented", not for a setup error.
+
 ## Rules
 
 - Mocking an INTERNAL collaborator contaminates the outer loop — remove it,

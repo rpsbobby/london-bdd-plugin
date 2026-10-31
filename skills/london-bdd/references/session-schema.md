@@ -31,9 +31,15 @@ base_branch: feature/place-order-main
 
 # GREENFIELD / FULL_REFACTOR — the outer net is the acceptance test
 acceptance_test:
+  kind: dsl                         # dsl (default, may be omitted) | contract
   file: tests/acceptance/place_order_test.cpp
   name: PlaceOrder.ReturnsIdAndPersists
   status: red                       # red | green | absent
+  # kind: contract only — the port's contract suite, run per subject:
+  # subjects:                       # >= 2: already-green ones + the new one
+  #   - InMemoryRunStore
+  #   - k8s.RunStore
+  # stub: internal/k8s/run_store.go # the new adapter's empty stub, if any
 
 # SAFE / FULL_REFACTOR — the outer net. The NET is the license to change
 # code; characterisation is only one way to build one. If the scope is
@@ -136,6 +142,16 @@ session.yml can carry state across that checkout. See `/commit-merge` and
   `go test -skip ^{outer_net}$ ./pkg/...`. `-skip` takes a regexp, so
   anchor it, or `TestFoo` also skips `TestFooBar`; from `close` on it
   becomes `^$`, which skips nothing.
+- `acceptance_test.kind: contract` is for a slice that adds an adapter
+  behind an existing port. The outer net is the port's contract suite,
+  run against every entry in `subjects`: green against the ones that
+  already exist, red against the new one. `stub` records the new
+  adapter's empty stub, if `/scenario` had to write one so the suite
+  compiles (signatures only, every method "not implemented"). The guard
+  treats a contract net like any acceptance test: red to enter `inner`,
+  left out of Rule E's checks until `close`, so the existing subjects'
+  cases ride along with it. `session.py validate` checks the kind and
+  that a contract names at least two subjects.
 - `tests` is the build list. `/decompose` writes it (`origin: planned`)
   after the human approves the whole map. Approved discovery proposals
   are appended (`origin: discovered`), as are behaviour findings accepted
