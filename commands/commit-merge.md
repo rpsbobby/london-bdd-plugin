@@ -55,10 +55,12 @@ reconcile against the target branch's tree.
 3. `git checkout feature/<slice>-main`
 4. `git merge --squash feature/<slice>-tmp`
 5. Exclude the slice's own bookkeeping from the landed commit — it
-   documents the slice, not the product:
-   `git restore --staged .bdd/session.yml 2>/dev/null; rm -f .bdd/session.yml`
-   (leave `.bdd/.merge-authorized` in place — it's still needed for the
-   next step).
+   documents the slice, not the product. All of `.bdd/` stays out, as in
+   manual mode (session.yml, design and scope notes, the archive), except
+   the untracked marker, which the next step still needs:
+   ```
+   git restore --staged .bdd/ 2>/dev/null; find .bdd -mindepth 1 ! -name .merge-authorized -delete
+   ```
 6. `git commit -m "<message>"`
 7. Clean up: `rm -f .bdd/.merge-authorized`.
 8. **Never push.** Pushing to a remote is always the developer's own
