@@ -23,9 +23,30 @@ Budget: ~10-15 turns per test (RED ~4, GREEN + commit ~4-6, REFACTOR ~2,
 COMMIT ~2),
 plus ~15 for discovery in round 1.
 
+## session.yml bookkeeping — use the helper
+
+Never hand-edit the bookkeeping fields of `.bdd/session.yml`. Route them
+through `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/session.py`, which writes
+atomically and refuses an update that would leave the file invalid:
+
+- `set-failing-test --test-file F --name N` — record `current_failing_test`
+- `set-test NAME --status red|green|done` — a test's status
+- `set-collaborator ROLE --status red|done` — a collaborator's status
+- `commit-cycle --message "cycle <n>: ..."` — `cycle` += 1, set
+  `last_commit`, clear `current_failing_test`
+- `set-discovery-rounds 1`
+- `validate` — structural check, reports every problem
+
+The helper never changes `phase:` (you never do either). Use `--file` if
+the session file isn't the nearest `.bdd/session.yml`. If a helper call
+refuses, fix what it names; don't fall back to a hand edit, and never
+write session.yml with a shell redirect (the guard blocks it).
+
 ## 0 — Resume-safety (first, every dispatch)
 
-Read `.bdd/session.yml`. The current branch must equal `branch:` (a
+Read `.bdd/session.yml` and run `session.py validate`; repair whatever
+it reports before continuing (a previous run may have left the file
+malformed). The current branch must equal `branch:` (a
 `feature/<slice>-tmp`) and the tree must be clean apart from session.yml.
 If not, stop with a `git-state-unexpected` escalation. Never checkout,
 stash, or commit someone else's work.
@@ -55,8 +76,8 @@ Shape (non-negotiable):
   map; otherwise fix the interface.
 
 Run it. It must fail for the right reason (behaviour absent, not a setup
-error). Set `current_failing_test` (file + name), the test's
-`status: red`, and its collaborator `status: red`.
+error). Record it with `set-failing-test`, then `set-test NAME --status red` and
+`set-collaborator ROLE --status red`.
 Announce `🔴 UT: <collaborator> — <behaviour>`.
 
 ## 2 — GREEN
@@ -71,7 +92,7 @@ Run the full unit suite. Still red after three honest attempts →
 escalate `stayed-red` with the real output. Don't thrash, and don't widen
 scope to help it pass.
 
-Green → set the test's `status: green` (leave `current_failing_test` set:
+Green → `set-test NAME --status green` (leave `current_failing_test` set:
 it licenses the refactor) and **commit**: test + impl + session.yml,
 `cycle <n>: <collaborator> — <behaviour> (green)`. Announce `🟢 UT:
 <collaborator> — <behaviour>`. See "Commit checks" below.
@@ -86,9 +107,10 @@ than the behaviour. Keep everything green. No new behaviour. Announce
 
 ## 4 — COMMIT
 
-Verify the branch. In session.yml: clear `current_failing_test`, set the
-test's `status: done`, set the collaborator `status: done` if all its
-tests are now done, increment `cycle`, update `last_commit`. Commit the
+Verify the branch. Run `set-test NAME --status done`, `set-collaborator
+ROLE --status done` if all its tests are now done, then `commit-cycle
+--message "cycle <n>: <collaborator> — <behaviour>"` (clears
+`current_failing_test`, increments `cycle`, updates `last_commit`). Commit the
 refactor + session.yml: `cycle <n>: <collaborator> — <behaviour>
 (refactor)`. Nothing to refactor still gets this commit; it carries the
 bookkeeping.
@@ -124,8 +146,8 @@ with a `turn-budget` escalation.
 
 When the queue is empty: if this is round 1 and `discovery_rounds` is 0,
 read `skills/london-bdd/references/test-discovery.md` and follow it. It
-proposes UT and AT candidates. You write no tests and no code here. Set
-`discovery_rounds: 1` in session.yml and commit it:
+proposes UT and AT candidates. You write no tests and no code here. Run
+`set-discovery-rounds 1` and commit it:
 `chore: discovery round 1 — <slice>`.
 
 Round 2 never runs discovery. Never set `phase:`. The driver decides
@@ -144,6 +166,11 @@ when the slice moves to `close`.
 - `turn-budget`: the budget guard tripped before a new test.
 
 ## Report: your only channel back
+
+Before returning ANY report, especially an escalated one, run
+`python3 ${CLAUDE_PLUGIN_ROOT}/scripts/session.py validate` and fix every
+problem it reports first (an escalation is exactly when the file tends to
+be left half-edited). Never hand back a malformed session.yml.
 
 End with exactly this shape:
 
