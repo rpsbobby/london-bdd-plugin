@@ -21,6 +21,11 @@ Read the `london-bdd` skill, `references/collaborator-discovery.md`, and
 
 ## Steps
 
+0. If `/design` left `.bdd/design-<slice>.md`, read it. Its decisions
+   (external boundaries, the outer net's test environment, where
+   artefacts live) constrain the map: what gets doubled, which package a
+   role lands in. Don't reopen them here; a map that can't honour one
+   is a question for the user.
 1. Starting from the entry point, ask per responsibility: *what does this
    object need to ask for or tell?* Name each discovered role by
    **capability, not implementation** (`OrderRepository`, not

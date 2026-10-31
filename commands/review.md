@@ -29,11 +29,19 @@ on feature/<slice>-tmp.
    names drifting from the ubiquitous language, boundary rule violations,
    test suite coherence, anything implemented beyond what tests demand.
    - `inner: granular`: dispatch `london-bdd:reviewer` with the full
-     slice diff (feature/<slice>-tmp vs base).
+     slice diff (feature/<slice>-tmp vs base), and
+     `.bdd/design-<slice>.md` if the slice has one.
    - `inner: batch`: you (the driver) already reviewed each builder round
      in `/inner`. Apply the findings accepted there, from
      `.bdd/review-<slice>.md`, then run `agents/reviewer.md`'s checklist
      over the full slice diff for anything that only shows across rounds.
+   **Design decisions.** If `/design` left `.bdd/design-<slice>.md`,
+   check the slice against each decision (the checklist's item 9 covers
+   it in both modes). For each drift, the user decides which side is
+   wrong. The code: it's a finding like any other, triaged below. The
+   decision: update it in the design file, with why, and if it has an
+   ADR, supersede that through `/adr`. Write down the answers to any
+   open questions the slice settled. The file goes in this step's commit.
    Present proposals; apply accepted ones; keep everything green.
    **Triage each finding by whether it changes behaviour.** Refactors,
    renames and test-support tidy-ups are applied here, under the green

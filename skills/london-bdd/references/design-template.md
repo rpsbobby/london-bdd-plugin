@@ -40,6 +40,9 @@ Rules of thumb:
 - An open question marked "blocks /scenario: yes" is settled or
   explicitly deferred in `/scenario`'s Phase 0, and the file is updated
   either way before the Gherkin is written.
-- `/scenario` treats the decisions as agreed: it doesn't reopen them
-  unless the user does, or the behaviour talk shows one was wrong. Then
-  the change goes into this file, with why.
+- `/scenario` and `/decompose` treat the decisions as agreed: they
+  don't reopen them unless the user does, or the work shows one was
+  wrong. Then the change goes into this file, with why.
+- `/review` checks the finished slice against every decision. A drift
+  is fixed in the code, or the decision is updated here (and its ADR
+  superseded); the user picks which.

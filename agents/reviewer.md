@@ -44,6 +44,11 @@ Review against, in order:
    characterisation tests are FINE; do not propose beautifying them.
    Instead flag ones whose behaviour is now well-understood as distil
    candidates.
+9. **Design decisions** (slice review only, when the slice has
+   `.bdd/design-<slice>.md`) — does the slice honour each recorded
+   decision (names, the outer net's test environment, where artefacts
+   live)? Flag every drift and say which decision it breaks. Whether the
+   code or the decision is wrong is the developer's call: propose both.
 
 Output format — a numbered list, each item:
 `[severity: block | should | consider] <finding> → <specific proposal>`

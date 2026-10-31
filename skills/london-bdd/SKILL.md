@@ -54,7 +54,8 @@ where to go.
 ground settled first: naming, the outer net's test environment, where
 artefacts live. It records decisions and open questions in
 `.bdd/design-<slice>.md`, which `/scenario` reads in Phase 0 and commits
-with the slice. It decides what sits around the slice, never the
+with the slice; `/decompose` maps within its decisions and `/review`
+checks the slice against them. It decides what sits around the slice, never the
 collaborators inside it: those are still discovered at `/decompose`.
 
 **The net is the license; characterisation is only one way to build it.**

@@ -59,7 +59,8 @@ ground. Read the `london-bdd` skill and `references/design-template.md`.
    `Status: agreed` if no blocking question is open, otherwise
    `Status: open`. Show it to the user and apply their edits.
 7. Tell the user the next command is `/scenario`, which reads this file
-   in Phase 0. If blocking questions are open, say they must be settled
+   in Phase 0. `/decompose` builds the map within its decisions, and
+   `/review` checks the finished slice against them. If blocking questions are open, say they must be settled
    (or explicitly deferred) there before the Gherkin is written; the user
    can also come back to `/design` once they have the answers.
 
